@@ -1,0 +1,30 @@
+CREATE TABLE indexed_task (
+    id TEXT NOT NULL PRIMARY KEY,
+    file_path TEXT NOT NULL,
+    line_index INTEGER NOT NULL,
+    source_line TEXT NOT NULL,
+    heading TEXT,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL,
+    due_date TEXT,
+    scheduled_date TEXT,
+    priority TEXT NOT NULL
+);
+
+CREATE INDEX indexed_task_file_path ON indexed_task(file_path);
+
+insertTask:
+INSERT OR REPLACE INTO indexed_task(id, file_path, line_index, source_line, heading, title, status, due_date, scheduled_date, priority)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAll:
+SELECT * FROM indexed_task;
+
+selectByFile:
+SELECT * FROM indexed_task WHERE file_path = ?;
+
+deleteByFile:
+DELETE FROM indexed_task WHERE file_path = ?;
+
+deleteAll:
+DELETE FROM indexed_task;

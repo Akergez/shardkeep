@@ -1,0 +1,15 @@
+<resources>
+    <string name="widget_today">Сегодня</string>
+    <string name="widget_no_tasks_today">Нет задач на сегодня</string>
+    <string name="widget_no_checklists">Нет чек-листов</string>
+    <string name="widget_checklists_title">Чек-листы</string>
+    <string name="widget_items_remaining">%d осталось</string>
+    <string name="widget_no_notes">Нет заметок</string>
+    <string name="widget_notes_title">Заметки</string>
+    <string name="notification_task_today">Задача на сегодня</string>
+    <string name="sync_trigger_manual">Ручная</string>
+    <string name="sync_trigger_background">Фоновая</string>
+    <string name="sync_error_generic">Ошибка синхронизации</string>
+    <string name="sync_error_background">Ошибка фоновой синхронизации</string>
+    <string name="config_not_found">config.toml не найден</string>
+</resources>

@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">Shardkeep</string>
+    <string name="task_widget_description">Задачи на сегодня</string>
+    <string name="quick_note_widget_description">Быстрая заметка</string>
+    <string name="checklist_widget_description">Чек-лист</string>
+    <string name="widget_today">Today</string>
+    <string name="widget_no_tasks_today">No tasks for today</string>
+    <string name="widget_no_checklists">No checklists</string>
+    <string name="widget_checklists_title">Checklists</string>
+    <string name="widget_items_remaining">%d remaining</string>
+    <string name="widget_no_notes">No notes</string>
+    <string name="widget_notes_title">Notes</string>
+    <string name="notification_task_today">Task for today</string>
+    <string name="sync_trigger_manual">Manual</string>
+    <string name="sync_trigger_background">Background</string>
+    <string name="sync_error_generic">Sync error</string>
+    <string name="sync_error_background">Background sync error</string>
+    <string name="config_not_found">config.toml not found</string>
+</resources>

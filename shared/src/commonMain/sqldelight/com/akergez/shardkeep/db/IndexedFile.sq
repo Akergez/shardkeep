@@ -1,0 +1,22 @@
+CREATE TABLE indexed_file (
+    path TEXT NOT NULL PRIMARY KEY,
+    listing_version TEXT NOT NULL,
+    indexed_at INTEGER NOT NULL,
+    headings TEXT NOT NULL DEFAULT ''
+);
+
+upsertFile:
+INSERT OR REPLACE INTO indexed_file(path, listing_version, indexed_at, headings)
+VALUES (?, ?, ?, ?);
+
+selectAll:
+SELECT * FROM indexed_file;
+
+selectByPath:
+SELECT * FROM indexed_file WHERE path = ?;
+
+deleteByPath:
+DELETE FROM indexed_file WHERE path = ?;
+
+deleteAll:
+DELETE FROM indexed_file;
