@@ -929,16 +929,16 @@ internal open class UniffiVTableCallbackInterfaceFfiVaultSource(
 
 
 // For large crates we prevent `MethodTooLargeException` (see #2340)
-// N.B. the name of the extension is very misleading, since it is 
-// rather `InterfaceTooLargeException`, caused by too many methods 
+// N.B. the name of the extension is very misleading, since it is
+// rather `InterfaceTooLargeException`, caused by too many methods
 // in the interface for large crates.
 //
 // By splitting the otherwise huge interface into two parts
-// * UniffiLib 
+// * UniffiLib
 // * IntegrityCheckingUniffiLib (this)
 // we allow for ~2x as many methods in the UniffiLib interface.
-// 
-// The `ffi_uniffi_contract_version` method and all checksum methods are put 
+//
+// The `ffi_uniffi_contract_version` method and all checksum methods are put
 // into `IntegrityCheckingUniffiLib` and these methods are called only once,
 // when the library is loaded.
 internal interface IntegrityCheckingUniffiLib : Library {
@@ -1037,8 +1037,8 @@ internal interface UniffiLib : Library {
         internal val INSTANCE: UniffiLib by lazy {
             val componentName = "tresse_ffi"
             // For large crates we prevent `MethodTooLargeException` (see #2340)
-            // N.B. the name of the extension is very misleading, since it is 
-            // rather `InterfaceTooLargeException`, caused by too many methods 
+            // N.B. the name of the extension is very misleading, since it is
+            // rather `InterfaceTooLargeException`, caused by too many methods
             // in the interface for large crates.
             //
             // By splitting the otherwise huge interface into two parts
@@ -1046,7 +1046,7 @@ internal interface UniffiLib : Library {
             // * IntegrityCheckingUniffiLib
             // And all checksum methods are put into `IntegrityCheckingUniffiLib`
             // we allow for ~2x as many methods in the UniffiLib interface.
-            // 
+            //
             // Thus we first load the library with `loadIndirect` as `IntegrityCheckingUniffiLib`
             // so that we can (optionally!) call `uniffiCheckApiChecksums`...
             loadIndirect<IntegrityCheckingUniffiLib>(componentName)
@@ -1061,7 +1061,7 @@ internal interface UniffiLib : Library {
             // to trigger this issue, the performance impact is negligible, running on
             // a macOS M1 machine the `loadIndirect` call takes ~50ms.
             val lib = loadIndirect<UniffiLib>(componentName)
-            // No need to check the contract version and checksums, since 
+            // No need to check the contract version and checksums, since
             // we already did that with `IntegrityCheckingUniffiLib` above.
             uniffiCallbackInterfaceFfiObjectStore.register(lib)
             uniffiCallbackInterfaceFfiRemoteKv.register(lib)
@@ -1070,7 +1070,7 @@ internal interface UniffiLib : Library {
             // Loading of library with integrity check done.
             lib
         }
-        
+
         // The Cleaner for the whole library
         internal val CLEANER: UniffiCleaner by lazy {
             UniffiCleaner.create()
@@ -1078,55 +1078,55 @@ internal interface UniffiLib : Library {
     }
 
     // FFI functions
-    fun uniffi_tresse_ffi_fn_clone_commitfirststepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_tresse_ffi_fn_clone_commitfirststepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_free_commitfirststepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_free_commitfirststepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun uniffi_tresse_ffi_fn_constructor_commitfirststepengine_new(`skelJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_constructor_commitfirststepengine_new(`skelJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_method_commitfirststepengine_is_done(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitfirststepengine_is_done(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
-fun uniffi_tresse_ffi_fn_method_commitfirststepengine_provide(`ptr`: Pointer,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitfirststepengine_provide(`ptr`: Pointer,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun uniffi_tresse_ffi_fn_method_commitfirststepengine_step(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitfirststepengine_step(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_method_commitfirststepengine_version_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitfirststepengine_version_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_clone_commitstepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_clone_commitstepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_free_commitstepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_free_commitstepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun uniffi_tresse_ffi_fn_constructor_commitstepengine_new(`nodeJson`: RustBuffer.ByValue,`skelJson`: RustBuffer.ByValue,`baseSize`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_constructor_commitstepengine_new(`nodeJson`: RustBuffer.ByValue,`skelJson`: RustBuffer.ByValue,`baseSize`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_method_commitstepengine_is_done(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitstepengine_is_done(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
-fun uniffi_tresse_ffi_fn_method_commitstepengine_outcome(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitstepengine_outcome(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_method_commitstepengine_provide(`ptr`: Pointer,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitstepengine_provide(`ptr`: Pointer,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun uniffi_tresse_ffi_fn_method_commitstepengine_step(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_commitstepengine_step(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_clone_ffirestoreiterator(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_clone_ffirestoreiterator(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_free_ffirestoreiterator(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_free_ffirestoreiterator(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun uniffi_tresse_ffi_fn_constructor_ffirestoreiterator_fromdiffs(`diffs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_constructor_ffirestoreiterator_fromdiffs(`diffs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_constructor_ffirestoreiterator_frommerged(`merged`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_constructor_ffirestoreiterator_frommerged(`merged`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_method_ffirestoreiterator_next_file(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_ffirestoreiterator_next_file(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_clone_restorestepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_clone_restorestepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_free_restorestepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_free_restorestepengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun uniffi_tresse_ffi_fn_constructor_restorestepengine_new(`baseSize`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_constructor_restorestepengine_new(`baseSize`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
-fun uniffi_tresse_ffi_fn_method_restorestepengine_is_done(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_restorestepengine_is_done(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
-fun uniffi_tresse_ffi_fn_method_restorestepengine_provide(`ptr`: Pointer,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_restorestepengine_provide(`ptr`: Pointer,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun uniffi_tresse_ffi_fn_method_restorestepengine_step(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_method_restorestepengine_step(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_tresse_ffi_fn_init_callback_vtable_ffiobjectstore(`vtable`: UniffiVTableCallbackInterfaceFfiObjectStore,
 ): Unit
@@ -1136,33 +1136,33 @@ fun uniffi_tresse_ffi_fn_init_callback_vtable_ffirestoresink(`vtable`: UniffiVTa
 ): Unit
 fun uniffi_tresse_ffi_fn_init_callback_vtable_ffivaultsource(`vtable`: UniffiVTableCallbackInterfaceFfiVaultSource,
 ): Unit
-fun uniffi_tresse_ffi_fn_func_cas_sync(`encryptionKeyB64`: RustBuffer.ByValue,`local`: Long,`remote`: Long,`source`: Long,`sink`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_cas_sync(`encryptionKeyB64`: RustBuffer.ByValue,`fileIndexJson`: RustBuffer.ByValue,`local`: Long,`remote`: Long,`source`: Long,`sink`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_commit_vault(`entryJson`: RustBuffer.ByValue,`baseBytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_commit_vault(`entryJson`: RustBuffer.ByValue,`baseBytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_generate_key(uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_generate_key(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_list_flat_versions(`bytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_list_flat_versions(`bytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_merge_all(`diffs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_merge_all(`diffs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_plan_sync(`localIds`: RustBuffer.ByValue,`remoteIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_plan_sync(`localIds`: RustBuffer.ByValue,`remoteIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_remote_blind(`keyB64`: RustBuffer.ByValue,`objectId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_remote_blind(`keyB64`: RustBuffer.ByValue,`objectId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_remote_open(`keyB64`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_remote_open(`keyB64`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_remote_seal(`keyB64`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_remote_seal(`keyB64`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_tresse_ffi_fn_func_to_jdr(`bytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_tresse_ffi_fn_func_to_jdr(`bytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun ffi_tresse_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun ffi_tresse_ffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun ffi_tresse_ffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun ffi_tresse_ffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun ffi_tresse_ffi_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1170,7 +1170,7 @@ fun ffi_tresse_ffi_rust_future_cancel_u8(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_u8(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
 fun ffi_tresse_ffi_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1178,7 +1178,7 @@ fun ffi_tresse_ffi_rust_future_cancel_i8(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_i8(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
 fun ffi_tresse_ffi_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1186,7 +1186,7 @@ fun ffi_tresse_ffi_rust_future_cancel_u16(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_u16(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Short
 fun ffi_tresse_ffi_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1194,7 +1194,7 @@ fun ffi_tresse_ffi_rust_future_cancel_i16(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_i16(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Short
 fun ffi_tresse_ffi_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1202,7 +1202,7 @@ fun ffi_tresse_ffi_rust_future_cancel_u32(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_u32(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Int
 fun ffi_tresse_ffi_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1210,7 +1210,7 @@ fun ffi_tresse_ffi_rust_future_cancel_i32(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_i32(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Int
 fun ffi_tresse_ffi_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1218,7 +1218,7 @@ fun ffi_tresse_ffi_rust_future_cancel_u64(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_u64(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Long
 fun ffi_tresse_ffi_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1226,7 +1226,7 @@ fun ffi_tresse_ffi_rust_future_cancel_i64(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_i64(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Long
 fun ffi_tresse_ffi_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1234,7 +1234,7 @@ fun ffi_tresse_ffi_rust_future_cancel_f32(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_f32(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Float
 fun ffi_tresse_ffi_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1242,7 +1242,7 @@ fun ffi_tresse_ffi_rust_future_cancel_f64(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_f64(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Double
 fun ffi_tresse_ffi_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1250,7 +1250,7 @@ fun ffi_tresse_ffi_rust_future_cancel_pointer(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_pointer(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
 fun ffi_tresse_ffi_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1258,7 +1258,7 @@ fun ffi_tresse_ffi_rust_future_cancel_rust_buffer(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_rust_buffer(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun ffi_tresse_ffi_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -1266,7 +1266,7 @@ fun ffi_tresse_ffi_rust_future_cancel_void(`handle`: Long,
 ): Unit
 fun ffi_tresse_ffi_rust_future_free_void(`handle`: Long,
 ): Unit
-fun ffi_tresse_ffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_tresse_ffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
 
 }
@@ -1282,7 +1282,7 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
-    if (lib.uniffi_tresse_ffi_checksum_func_cas_sync() != 22857.toShort()) {
+    if (lib.uniffi_tresse_ffi_checksum_func_cas_sync() != 44339.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_tresse_ffi_checksum_func_commit_vault() != 39954.toShort()) {
@@ -1477,7 +1477,7 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
         }
     }
 
-/** 
+/**
  * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
  *
  * @suppress
@@ -1847,18 +1847,18 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
  * ```
  */
 public interface CommitFirstStepEngineInterface {
-    
+
     fun `isDone`(): kotlin.Boolean
-    
+
     fun `provide`(`data`: kotlin.ByteArray)
-    
+
     fun `step`(): FfiStep
-    
+
     /**
      * The new version ID, available once `step()` returned `Done`.
      */
     fun `versionId`(): kotlin.String?
-    
+
     companion object
 }
 
@@ -1988,18 +1988,18 @@ open class CommitFirstStepEngine: Disposable, AutoCloseable, CommitFirstStepEngi
     }
     )
     }
-    
+
 
     override fun `provide`(`data`: kotlin.ByteArray)
-        = 
+        =
     callWithPointer {
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_tresse_ffi_fn_method_commitfirststepengine_provide(
         it, FfiConverterByteArray.lower(`data`),_status)
 }
     }
-    
-    
+
+
 
     override fun `step`(): FfiStep {
             return FfiConverterTypeFfiStep.lift(
@@ -2011,9 +2011,9 @@ open class CommitFirstStepEngine: Disposable, AutoCloseable, CommitFirstStepEngi
     }
     )
     }
-    
 
-    
+
+
     /**
      * The new version ID, available once `step()` returned `Done`.
      */override fun `versionId`(): kotlin.String? {
@@ -2026,14 +2026,14 @@ open class CommitFirstStepEngine: Disposable, AutoCloseable, CommitFirstStepEngi
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -2188,27 +2188,27 @@ public object FfiConverterTypeCommitFirstStepEngine: FfiConverter<CommitFirstSte
  * ```
  */
 public interface CommitStepEngineInterface {
-    
+
     /**
      * Whether the commit has completed.
      */
     fun `isDone`(): kotlin.Boolean
-    
+
     /**
      * The commit outcome, available once `step()` returned `Done`.
      */
     fun `outcome`(): FfiCommitOutcome?
-    
+
     /**
      * Supply the result of the most recent step (bytes for Read/OutRead, empty for others).
      */
     fun `provide`(`data`: kotlin.ByteArray)
-    
+
     /**
      * Advance to the next host interaction.
      */
     fun `step`(): FfiStep
-    
+
     companion object
 }
 
@@ -2332,7 +2332,7 @@ open class CommitStepEngine: Disposable, AutoCloseable, CommitStepEngineInterfac
         }
     }
 
-    
+
     /**
      * Whether the commit has completed.
      */override fun `isDone`(): kotlin.Boolean {
@@ -2345,9 +2345,9 @@ open class CommitStepEngine: Disposable, AutoCloseable, CommitStepEngineInterfac
     }
     )
     }
-    
 
-    
+
+
     /**
      * The commit outcome, available once `step()` returned `Done`.
      */override fun `outcome`(): FfiCommitOutcome? {
@@ -2360,23 +2360,23 @@ open class CommitStepEngine: Disposable, AutoCloseable, CommitStepEngineInterfac
     }
     )
     }
-    
 
-    
+
+
     /**
      * Supply the result of the most recent step (bytes for Read/OutRead, empty for others).
      */override fun `provide`(`data`: kotlin.ByteArray)
-        = 
+        =
     callWithPointer {
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_tresse_ffi_fn_method_commitstepengine_provide(
         it, FfiConverterByteArray.lower(`data`),_status)
 }
     }
-    
-    
 
-    
+
+
+
     /**
      * Advance to the next host interaction.
      */override fun `step`(): FfiStep {
@@ -2389,14 +2389,14 @@ open class CommitStepEngine: Disposable, AutoCloseable, CommitStepEngineInterfac
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -2542,12 +2542,12 @@ public object FfiConverterTypeCommitStepEngine: FfiConverter<CommitStepEngine, P
  * ```
  */
 public interface FfiRestoreIteratorInterface {
-    
+
     /**
      * Return the next file, or `null` when done.
      */
     fun `nextFile`(): FfiRestoredFile?
-    
+
     companion object
 }
 
@@ -2648,7 +2648,7 @@ open class FfiRestoreIterator: Disposable, AutoCloseable, FfiRestoreIteratorInte
         }
     }
 
-    
+
     /**
      * Return the next file, or `null` when done.
      */
@@ -2662,13 +2662,13 @@ open class FfiRestoreIterator: Disposable, AutoCloseable, FfiRestoreIteratorInte
     }
     )
     }
-    
 
-    
 
-    
+
+
+
     companion object {
-        
+
     /**
      * Build a restore iterator from a list of version diffs (each as binary RDX bytes).
      */ fun `fromDiffs`(`diffs`: List<kotlin.ByteArray>): FfiRestoreIterator {
@@ -2679,9 +2679,9 @@ open class FfiRestoreIterator: Disposable, AutoCloseable, FfiRestoreIteratorInte
 }
     )
     }
-    
 
-        
+
+
     /**
      * Build a restore iterator from a single merged RDX blob.
      */ fun `fromMerged`(`merged`: kotlin.ByteArray): FfiRestoreIterator {
@@ -2692,11 +2692,11 @@ open class FfiRestoreIterator: Disposable, AutoCloseable, FfiRestoreIteratorInte
 }
     )
     }
-    
 
-        
+
+
     }
-    
+
 }
 
 /**
@@ -2847,13 +2847,13 @@ public object FfiConverterTypeFfiRestoreIterator: FfiConverter<FfiRestoreIterato
  * ```
  */
 public interface RestoreStepEngineInterface {
-    
+
     fun `isDone`(): kotlin.Boolean
-    
+
     fun `provide`(`data`: kotlin.ByteArray)
-    
+
     fun `step`(): FfiStep
-    
+
     companion object
 }
 
@@ -2979,18 +2979,18 @@ open class RestoreStepEngine: Disposable, AutoCloseable, RestoreStepEngineInterf
     }
     )
     }
-    
+
 
     override fun `provide`(`data`: kotlin.ByteArray)
-        = 
+        =
     callWithPointer {
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_tresse_ffi_fn_method_restorestepengine_provide(
         it, FfiConverterByteArray.lower(`data`),_status)
 }
     }
-    
-    
+
+
 
     override fun `step`(): FfiStep {
             return FfiConverterTypeFfiStep.lift(
@@ -3002,14 +3002,14 @@ open class RestoreStepEngine: Disposable, AutoCloseable, RestoreStepEngineInterf
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -3043,13 +3043,13 @@ public object FfiConverterTypeRestoreStepEngine: FfiConverter<RestoreStepEngine,
 
 
 data class FfiCommitResult (
-    var `versionId`: kotlin.String, 
+    var `versionId`: kotlin.String,
     /**
      * The version delta as binary RDX bytes.
      */
     var `diff`: kotlin.ByteArray
 ) {
-    
+
     companion object
 }
 
@@ -3084,29 +3084,33 @@ data class FfiSyncOutcome (
     /**
      * A new local version was committed this pass.
      */
-    var `committed`: kotlin.Boolean, 
+    var `committed`: kotlin.Boolean,
     /**
      * The committed version label, when `committed` is true.
      */
-    var `versionId`: kotlin.String?, 
+    var `versionId`: kotlin.String?,
     /**
      * Objects (meta + content) uploaded to the remote.
      */
-    var `pushed`: kotlin.UInt, 
+    var `pushed`: kotlin.UInt,
     /**
      * Meta objects downloaded from the remote.
      */
-    var `pulled`: kotlin.UInt, 
+    var `pulled`: kotlin.UInt,
     /**
      * Files written to the vault during restore.
      */
-    var `restored`: kotlin.UInt, 
+    var `restored`: kotlin.UInt,
     /**
      * Files removed from the vault during restore (tombstones).
      */
-    var `removed`: kotlin.UInt
+    var `removed`: kotlin.UInt,
+    /**
+     * Updated local-only `.tresse/file-index.json` payload.
+     */
+    var `fileIndexJson`: kotlin.String
 ) {
-    
+
     companion object
 }
 
@@ -3122,6 +3126,7 @@ public object FfiConverterTypeFfiSyncOutcome: FfiConverterRustBuffer<FfiSyncOutc
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
@@ -3131,7 +3136,8 @@ public object FfiConverterTypeFfiSyncOutcome: FfiConverterRustBuffer<FfiSyncOutc
             FfiConverterUInt.allocationSize(value.`pushed`) +
             FfiConverterUInt.allocationSize(value.`pulled`) +
             FfiConverterUInt.allocationSize(value.`restored`) +
-            FfiConverterUInt.allocationSize(value.`removed`)
+            FfiConverterUInt.allocationSize(value.`removed`) +
+            FfiConverterString.allocationSize(value.`fileIndexJson`)
     )
 
     override fun write(value: FfiSyncOutcome, buf: ByteBuffer) {
@@ -3141,6 +3147,7 @@ public object FfiConverterTypeFfiSyncOutcome: FfiConverterRustBuffer<FfiSyncOutc
             FfiConverterUInt.write(value.`pulled`, buf)
             FfiConverterUInt.write(value.`restored`, buf)
             FfiConverterUInt.write(value.`removed`, buf)
+            FfiConverterString.write(value.`fileIndexJson`, buf)
     }
 }
 
@@ -3150,13 +3157,13 @@ data class FfiSyncPlan (
     /**
      * Version IDs that exist on remote but not locally; should be fetched.
      */
-    var `fetch`: List<kotlin.String>, 
+    var `fetch`: List<kotlin.String>,
     /**
      * Version IDs that exist locally but not on remote; should be pushed.
      */
     var `push`: List<kotlin.String>
 ) {
-    
+
     companion object
 }
 
@@ -3191,13 +3198,15 @@ data class FfiVaultFile (
     /**
      * Vault-relative path with `/` separators (e.g. `Tasks/today.md`).
      */
-    var `path`: kotlin.String, 
+    var `path`: kotlin.String,
     /**
      * `true` for non-UTF-8 payloads, `false` for markdown/text.
      */
-    var `binary`: kotlin.Boolean
+    var `binary`: kotlin.Boolean,
+    var `mtimeMs`: kotlin.ULong,
+    var `size`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -3209,30 +3218,36 @@ public object FfiConverterTypeFfiVaultFile: FfiConverterRustBuffer<FfiVaultFile>
         return FfiVaultFile(
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
         )
     }
 
     override fun allocationSize(value: FfiVaultFile) = (
             FfiConverterString.allocationSize(value.`path`) +
-            FfiConverterBoolean.allocationSize(value.`binary`)
+            FfiConverterBoolean.allocationSize(value.`binary`) +
+            FfiConverterULong.allocationSize(value.`mtimeMs`) +
+            FfiConverterULong.allocationSize(value.`size`)
     )
 
     override fun write(value: FfiVaultFile, buf: ByteBuffer) {
             FfiConverterString.write(value.`path`, buf)
             FfiConverterBoolean.write(value.`binary`, buf)
+            FfiConverterULong.write(value.`mtimeMs`, buf)
+            FfiConverterULong.write(value.`size`, buf)
     }
 }
 
 
 
 sealed class FfiCommitOutcome {
-    
+
     /**
      * Nothing changed; no delta was written.
      */
     object NoChange : FfiCommitOutcome()
-    
-    
+
+
     /**
      * A delta was successfully streamed. `version_id` is the new version label.
      */
@@ -3240,16 +3255,16 @@ sealed class FfiCommitOutcome {
         val `versionId`: kotlin.String) : FfiCommitOutcome() {
         companion object
     }
-    
+
     /**
      * Structural change too large for the streaming path;
      * caller should re-commit via `commit_vault` with full content.
      */
     object Fallback : FfiCommitOutcome()
-    
-    
 
-    
+
+
+
     companion object
 }
 
@@ -3314,21 +3329,21 @@ public object FfiConverterTypeFfiCommitOutcome : FfiConverterRustBuffer<FfiCommi
 
 
 sealed class FfiRestoredFile {
-    
+
     data class Text(
-        val `path`: kotlin.String, 
+        val `path`: kotlin.String,
         val `content`: kotlin.String) : FfiRestoredFile() {
         companion object
     }
-    
+
     data class Binary(
-        val `path`: kotlin.String, 
+        val `path`: kotlin.String,
         val `data`: kotlin.ByteArray) : FfiRestoredFile() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -3392,17 +3407,17 @@ public object FfiConverterTypeFfiRestoredFile : FfiConverterRustBuffer<FfiRestor
 
 
 sealed class FfiStep {
-    
+
     /**
      * Read `len` bytes at `off` from input `input`. Respond with those bytes.
      */
     data class Read(
-        val `input`: kotlin.UInt, 
-        val `off`: kotlin.ULong, 
+        val `input`: kotlin.UInt,
+        val `off`: kotlin.ULong,
         val `len`: kotlin.ULong) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Read the whole named file at `path`. Respond with its bytes.
      */
@@ -3410,17 +3425,17 @@ sealed class FfiStep {
         val `path`: kotlin.String) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Read `len` bytes at `off` from named file `path`. Respond with those bytes.
      */
     data class FetchRange(
-        val `path`: kotlin.String, 
-        val `off`: kotlin.ULong, 
+        val `path`: kotlin.String,
+        val `off`: kotlin.ULong,
         val `len`: kotlin.ULong) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Append `bytes` to the output sink. Respond with empty bytes.
      */
@@ -3428,65 +3443,65 @@ sealed class FfiStep {
         val `bytes`: kotlin.ByteArray) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Read already-written output `[from, to)`. Respond with those bytes.
      */
     data class OutRead(
-        val `from`: kotlin.ULong, 
+        val `from`: kotlin.ULong,
         val `to`: kotlin.ULong) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Truncate output to `from`, then append `bytes`. Respond with empty.
      */
     data class OutReplace(
-        val `from`: kotlin.ULong, 
+        val `from`: kotlin.ULong,
         val `bytes`: kotlin.ByteArray) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Overwrite `bytes.len()` bytes at `at` in place. Respond with empty.
      */
     data class OutPatch(
-        val `at`: kotlin.ULong, 
+        val `at`: kotlin.ULong,
         val `bytes`: kotlin.ByteArray) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Write one restored file to disk; `binary=true` → ByteArray, else UTF-8.
      * Respond with empty bytes.
      */
     data class EmitFile(
-        val `path`: kotlin.String, 
-        val `binary`: kotlin.Boolean, 
+        val `path`: kotlin.String,
+        val `binary`: kotlin.Boolean,
         val `bytes`: kotlin.ByteArray) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Fetch content-addressed object `id` from store `class`.
      * Respond with its bytes, or empty if not present.
      */
     data class ObjGet(
-        val `class`: kotlin.UInt, 
+        val `class`: kotlin.UInt,
         val `id`: kotlin.String) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Persist `bytes` as a content-addressed object in store `class`.
      * Respond with empty bytes.
      */
     data class ObjPut(
-        val `class`: kotlin.UInt, 
+        val `class`: kotlin.UInt,
         val `bytes`: kotlin.ByteArray) : FfiStep() {
         companion object
     }
-    
+
     /**
      * Report the byte length of file at `path`.
      * Respond with 8 little-endian bytes of the length.
@@ -3495,13 +3510,13 @@ sealed class FfiStep {
         val `path`: kotlin.String) : FfiStep() {
         companion object
     }
-    
+
     /**
      * The algorithm completed successfully.
      */
     object Done : FfiStep()
-    
-    
+
+
     /**
      * The algorithm encountered an error.
      */
@@ -3509,9 +3524,9 @@ sealed class FfiStep {
         val `message`: kotlin.String) : FfiStep() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -3765,21 +3780,21 @@ public object FfiConverterTypeFfiStep : FfiConverterRustBuffer<FfiStep>{
 
 
 sealed class TresseException: kotlin.Exception() {
-    
+
     class General(
-        
+
         val v1: kotlin.String
         ) : TresseException() {
         override val message
             get() = "v1=${ v1 }"
     }
-    
+
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<TresseException> {
         override fun lift(error_buf: RustBuffer.ByValue): TresseException = FfiConverterTypeTresseError.lift(error_buf)
     }
 
-    
+
 }
 
 /**
@@ -3787,7 +3802,7 @@ sealed class TresseException: kotlin.Exception() {
  */
 public object FfiConverterTypeTresseError : FfiConverterRustBuffer<TresseException> {
     override fun read(buf: ByteBuffer): TresseException {
-        
+
 
         return when(buf.getInt()) {
             1 -> TresseException.General(
@@ -3832,30 +3847,30 @@ public object FfiConverterTypeTresseError : FfiConverterRustBuffer<TresseExcepti
  * blake3 hex, and each object's bytes hash to its id.
  */
 public interface FfiObjectStore {
-    
+
     /**
      * Ids currently held in `class`. Non-object entries (temp files, `.` names)
      * must be tolerated by the caller — the adapter filters to valid ids.
      */
     fun `list`(`class`: kotlin.String): List<kotlin.String>
-    
+
     /**
      * Object bytes, or `None` if absent — a miss tells the engine to fetch it
      * from the remote instead of failing the sync.
      */
     fun `get`(`class`: kotlin.String, `id`: kotlin.String): kotlin.ByteArray?
-    
+
     /**
      * Persist `bytes` under `id`. Content-addressed, so this is idempotent: an id
      * that already exists holds the correct bytes and may be left untouched.
      */
     fun `put`(`class`: kotlin.String, `id`: kotlin.String, `bytes`: kotlin.ByteArray)
-    
+
     /**
      * Delete one object. Idempotent — deleting an absent id is not an error.
      */
     fun `delete`(`class`: kotlin.String, `id`: kotlin.String)
-    
+
     companion object
 }
 
@@ -3973,15 +3988,15 @@ public object FfiConverterTypeFfiObjectStore: FfiConverterCallbackInterface<FfiO
  * `rdx_sync::RemoteKv`; keys are `meta/<blind>` and `content/<blind>`.
  */
 public interface FfiRemoteKv {
-    
+
     fun `list`(`prefix`: kotlin.String): List<kotlin.String>
-    
+
     fun `get`(`key`: kotlin.String): kotlin.ByteArray
-    
+
     fun `put`(`key`: kotlin.String, `value`: kotlin.ByteArray)
-    
+
     fun `delete`(`key`: kotlin.String)
-    
+
     companion object
 }
 
@@ -4095,13 +4110,13 @@ public object FfiConverterTypeFfiRemoteKv: FfiConverterCallbackInterface<FfiRemo
  * Write side of the vault for restore (Kotlin: SAF `VaultStorage`).
  */
 public interface FfiRestoreSink {
-    
+
     fun `writeText`(`path`: kotlin.String, `content`: kotlin.String)
-    
+
     fun `writeBinary`(`path`: kotlin.String, `data`: kotlin.ByteArray)
-    
+
     fun `remove`(`path`: kotlin.String)
-    
+
     companion object
 }
 
@@ -4198,13 +4213,13 @@ public object FfiConverterTypeFfiRestoreSink: FfiConverterCallbackInterface<FfiR
  * Read side of the vault (Kotlin: SAF `VaultStorage`).
  */
 public interface FfiVaultSource {
-    
+
     fun `listFiles`(): List<FfiVaultFile>
-    
+
     fun `len`(`path`: kotlin.String): kotlin.ULong
-    
+
     fun `read`(`path`: kotlin.String, `offset`: kotlin.ULong, `len`: kotlin.ULong): kotlin.ByteArray
-    
+
     companion object
 }
 
@@ -4533,15 +4548,15 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
          * - `local`: the vault's own plaintext local CAS (`.tresse/{meta,content}` via SAF).
          * - `remote` / `source` / `sink`: Kotlin-provided remote KV and vault I/O.
          */
-    @Throws(TresseException::class) fun `casSync`(`encryptionKeyB64`: kotlin.String, `local`: FfiObjectStore, `remote`: FfiRemoteKv, `source`: FfiVaultSource, `sink`: FfiRestoreSink): FfiSyncOutcome {
+    @Throws(TresseException::class) fun `casSync`(`encryptionKeyB64`: kotlin.String, `fileIndexJson`: kotlin.String?, `local`: FfiObjectStore, `remote`: FfiRemoteKv, `source`: FfiVaultSource, `sink`: FfiRestoreSink): FfiSyncOutcome {
             return FfiConverterTypeFfiSyncOutcome.lift(
     uniffiRustCallWithError(TresseException) { _status ->
     UniffiLib.INSTANCE.uniffi_tresse_ffi_fn_func_cas_sync(
-        FfiConverterString.lower(`encryptionKeyB64`),FfiConverterTypeFfiObjectStore.lower(`local`),FfiConverterTypeFfiRemoteKv.lower(`remote`),FfiConverterTypeFfiVaultSource.lower(`source`),FfiConverterTypeFfiRestoreSink.lower(`sink`),_status)
+        FfiConverterString.lower(`encryptionKeyB64`),FfiConverterOptionalString.lower(`fileIndexJson`),FfiConverterTypeFfiObjectStore.lower(`local`),FfiConverterTypeFfiRemoteKv.lower(`remote`),FfiConverterTypeFfiVaultSource.lower(`source`),FfiConverterTypeFfiRestoreSink.lower(`sink`),_status)
 }
     )
     }
-    
+
 
         /**
          * Commit a full vault snapshot against an optional base.
@@ -4561,7 +4576,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * Generate a base64-encoded 256-bit key compatible with the WASM and
@@ -4575,7 +4590,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * List the version IDs present in a flat RDX diff stream.
@@ -4591,7 +4606,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * Merge a list of version diffs into one accumulated RDX blob.
@@ -4607,7 +4622,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * Compute a bidirectional sync plan from local and remote version ID lists.
@@ -4622,7 +4637,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * Derive the opaque remote object id for a local version id.
@@ -4635,7 +4650,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * Decrypt a version diff downloaded from remote storage.
@@ -4648,7 +4663,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * Encrypt a version diff for remote storage.
@@ -4661,7 +4676,7 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
         /**
          * Render binary RDX bytes as a JDR text string (for debugging / inspection).
@@ -4674,6 +4689,6 @@ public object FfiConverterSequenceTypeFfiVaultFile: FfiConverterRustBuffer<List<
 }
     )
     }
-    
+
 
 

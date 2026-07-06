@@ -86,13 +86,16 @@ class TresseSync(private val notesDirectory: NotesDirectoryStorage) {
         require(config.encryptionKey.isNotBlank()) { "Tresse encryption key is required" }
         require(config.isComplete()) { "Tresse ${config.storageType} sync configuration is incomplete" }
 
+        val localStore = NotesDirectoryObjectStore(notesDirectory)
         val outcome = casSync(
             encryptionKeyB64 = config.encryptionKey,
-            local = NotesDirectoryObjectStore(notesDirectory),
+            fileIndexJson = localStore.readFileIndex(),
+            local = localStore,
             remote = CountingRemoteKv(remoteKvOf(config), progress),
             source = NotesDirectorySource(notesDirectory, config, progress),
             sink = NotesDirectorySink(notesDirectory, config, progress),
         )
+        localStore.writeFileIndex(outcome.fileIndexJson)
         TresseSyncResult(
             pushed = outcome.pushed.toInt(),
             pulled = outcome.pulled.toInt(),
@@ -147,10 +150,13 @@ private class NotesDirectorySource(
             // Ignore patterns (from config.toml) + `.tresse` are pruned during the
             // scan itself, so ignored trees are never walked while building the skel.
             notesDirectory.listAllFiles { ignoredPath(it, config) }
-                .map { it.path.value }
-                .distinct()
-                .sorted()
-                .map { FfiVaultFile(path = it, binary = !isTextPath(it)) }
+                .distinctBy { it.path.value }
+                .sortedBy { it.path.value }
+                .map {
+                    val path = it.path.value
+                    val mtime = it.version.value.substringBefore(':').toULongOrNull() ?: 0uL
+                    FfiVaultFile(path = path, binary = !isTextPath(path), mtimeMs = mtime, size = it.size.coerceAtLeast(0).toULong())
+                }
         }
     } catch (error: Throwable) {
         throw TresseException.General("listing notes directory failed: ${error.message}")
@@ -241,6 +247,13 @@ private class NotesDirectorySink(
  * notes-directory calls are bridged with `runBlocking` on the engine's IO thread.
  */
 private class NotesDirectoryObjectStore(private val notesDirectory: NotesDirectoryStorage) : FfiObjectStore {
+    fun readFileIndex(): String? = runBlocking {
+        notesDirectory.storeRead(".tresse/file-index.json")?.decodeToString()
+    }
+
+    fun writeFileIndex(json: String) = runBlocking {
+        notesDirectory.storeWrite(".tresse/file-index.json", json.encodeToByteArray())
+    }
     override fun list(`class`: String): List<String> = try {
         runBlocking { notesDirectory.storeList(".tresse/$`class`") }
     } catch (error: Throwable) {
