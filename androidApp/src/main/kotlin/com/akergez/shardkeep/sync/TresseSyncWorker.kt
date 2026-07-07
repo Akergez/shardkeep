@@ -6,6 +6,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.akergez.shardkeep.R
 import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
+import com.akergez.tresse.kmp.TresseSync
+import com.akergez.tresse.kmp.safTresseVault
 
 class TresseSyncWorker(
     appContext: Context,
@@ -21,7 +23,8 @@ class TresseSyncWorker(
             if (!config.isComplete()) return Result.success()
             if (!config.autoSyncEnabled && !inputData.getBoolean(KEY_FORCE, false)) return Result.success()
             SyncStatusHolder.store.begin(applicationContext.getString(R.string.sync_trigger_background))
-            val result = TresseSync(storage).perform(config, SyncStatusHolder.store)
+            val vault = safTresseVault(applicationContext, treeUri) { ignoredPath(it, config) }
+            val result = TresseSync(vault).perform(config, SyncStatusHolder.store.asProgress())
             SyncStatusHolder.store.finishOk(summaryOf(result), SyncStatusHolder.nowLabel())
             Result.success()
         } catch (error: Throwable) {
@@ -40,10 +43,4 @@ class TresseSyncWorker(
         const val KEY_FORCE = "force"
         private const val MAX_RETRIES = 3
     }
-}
-
-internal fun TresseConfig.isComplete(): Boolean = encryptionKey.isNotBlank() && when (storageType) {
-    "s3" -> s3Endpoint.isNotBlank() && s3Bucket.isNotBlank() &&
-        s3AccessKeyId.isNotBlank() && s3SecretAccessKey.isNotBlank()
-    else -> serverUrl.isNotBlank() && repoId.isNotBlank()
 }

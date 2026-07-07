@@ -40,12 +40,14 @@ import com.akergez.shardkeep.widget.QuickNoteWidget
 import com.akergez.shardkeep.widget.TaskWidget
 import com.akergez.shardkeep.widget.WidgetNavigation
 import com.akergez.shardkeep.sync.TresseConfig
-import com.akergez.shardkeep.sync.TresseConfigString
+import com.akergez.tresse.kmp.TresseConfigString
+import com.akergez.tresse.kmp.TresseSync
+import com.akergez.tresse.kmp.safTresseVault
 import com.akergez.shardkeep.sync.TresseConfigFile
-import com.akergez.shardkeep.sync.TresseSync
 import com.akergez.shardkeep.sync.TresseSyncScheduler
 import com.akergez.shardkeep.sync.SyncStatusHolder
-import com.akergez.shardkeep.sync.isComplete
+import com.akergez.shardkeep.sync.asProgress
+import com.akergez.shardkeep.sync.ignoredPath
 import com.akergez.shardkeep.sync.summaryOf
 import com.akergez.shardkeep.sync.saveLocalSync
 import com.akergez.shardkeep.sync.withLocalSync
@@ -258,7 +260,8 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     try {
                         val config = requireNotNull(TresseConfigFile.read(storage)) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
-                        val result = TresseSync(storage).perform(config, SyncStatusHolder.store)
+                        val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
+                        val result = TresseSync(vault).perform(config, SyncStatusHolder.store.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
                         val summary = summaryOf(result)

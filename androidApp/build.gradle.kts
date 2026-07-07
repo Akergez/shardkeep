@@ -15,6 +15,7 @@ tasks.withType<KotlinCompile>().configureEach {
 
 dependencies {
     implementation(projects.shared)
+    implementation(projects.tresseKmp)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.compose.material3)
