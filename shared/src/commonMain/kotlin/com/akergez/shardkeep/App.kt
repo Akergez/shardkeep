@@ -54,6 +54,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
@@ -214,6 +215,7 @@ import shardkeep.shared.generated.resources.sync_not_configured
 import shardkeep.shared.generated.resources.sync_auto_indicator
 import shardkeep.shared.generated.resources.syncing
 import shardkeep.shared.generated.resources.sync_now
+import shardkeep.shared.generated.resources.force_pull
 
 @Composable
 @Preview
@@ -262,6 +264,8 @@ data class SettingsCallbacks(
     val onImportSyncConfig: suspend (String) -> Boolean = { false },
     /** Runs a sync and returns a short human-readable summary; throws on failure. */
     val onSync: (suspend () -> String)? = null,
+    /** Pulls remote state into an uninitialized local vault without committing first. */
+    val onForcePull: (suspend () -> String)? = null,
     /** Live sync status (manual + background); when null, the status panel is hidden. */
     val syncState: StateFlow<SyncState>? = null,
 )
@@ -1115,6 +1119,15 @@ private fun SettingsContent(
                         }
                     }
                 },
+                onForcePull = callbacks.onForcePull?.let { forcePull ->
+                    {
+                        scope.launch {
+                            syncing = true
+                            runCatching { forcePull() }
+                            syncing = false
+                        }
+                    }
+                },
             )
         }
         Text(
@@ -1304,6 +1317,7 @@ private fun SyncStatusCard(
     stateFlow: StateFlow<SyncState>,
     syncing: Boolean,
     onSyncNow: (() -> Unit)?,
+    onForcePull: (() -> Unit)?,
 ) {
     val state by stateFlow.collectAsState()
     val accent = when (state.phase) {
@@ -1392,21 +1406,37 @@ private fun SyncStatusCard(
         }
 
         // Action.
-        onSyncNow?.let { run ->
-            Button(
-                onClick = run,
-                enabled = !syncing && !state.active,
+        if (onSyncNow != null || onForcePull != null) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (syncing || state.active) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Spacer(Modifier.width(8.dp))
+                onSyncNow?.let { run ->
+                    Button(
+                        onClick = run,
+                        enabled = !syncing && !state.active,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (syncing || state.active) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(if (syncing || state.active) stringResource(Res.string.syncing) else stringResource(Res.string.sync_now))
+                    }
                 }
-                Text(if (syncing || state.active) stringResource(Res.string.syncing) else stringResource(Res.string.sync_now))
+                onForcePull?.let { run ->
+                    OutlinedButton(
+                        onClick = run,
+                        enabled = !syncing && !state.active,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(Res.string.force_pull))
+                    }
+                }
             }
         }
     }

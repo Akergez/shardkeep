@@ -275,6 +275,26 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                         throw error
                     }
                 },
+                onForcePull = {
+                    SyncStatusHolder.store.begin(getString(R.string.sync_trigger_manual))
+                    try {
+                        val config = requireNotNull(TresseConfigFile.read(storage)) { getString(R.string.config_not_found) }
+                            .withLocalSync(preferences)
+                        val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
+                        val result = TresseSync(vault).forcePull(config, SyncStatusHolder.store.asProgress())
+                        repository.refresh()
+                        quickNoteRepository.refresh()
+                        val summary = summaryOf(result)
+                        SyncStatusHolder.store.finishOk(summary, SyncStatusHolder.nowLabel())
+                        summary
+                    } catch (error: Throwable) {
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        SyncStatusHolder.store.finishError(
+                            error.message?.takeIf { it.isNotBlank() } ?: getString(R.string.sync_error_generic),
+                        )
+                        throw error
+                    }
+                },
                 syncState = SyncStatusHolder.store.state,
             ),
         )

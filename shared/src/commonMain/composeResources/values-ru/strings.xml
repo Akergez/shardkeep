@@ -105,4 +105,5 @@
     <string name="sync_auto_indicator">· авто</string>
     <string name="syncing">Синхронизация…</string>
     <string name="sync_now">Синхронизировать</string>
+    <string name="force_pull">Force pull</string>
 </resources>
