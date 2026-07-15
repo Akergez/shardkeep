@@ -25,6 +25,15 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        if (providers.environmentVariable("TRESSE_KMP_USE_MAVEN_LOCAL").orNull == "true") {
+            mavenLocal()
+        }
+        maven {
+            name = "TresseGitLab"
+            url = uri(providers.environmentVariable("TRESSE_KMP_MAVEN_URL")
+                .orElse("https://gitlab.com/api/v4/projects/84164267/packages/maven").get())
+            content { includeGroup("com.akergez.tresse") }
+        }
     }
 }
 
@@ -35,11 +44,3 @@ plugins {
 include(":androidApp")
 include(":desktopApp")
 include(":shared")
-
-// Shared tresse sync engine. Sibling checkout by default; override with TRESSE_KMP_DIR.
-val tresseKmpDir = file(System.getenv("TRESSE_KMP_DIR") ?: "../tresse-kmp")
-check(tresseKmpDir.resolve("build.gradle.kts").isFile) {
-    "tresse-kmp not found at $tresseKmpDir; set TRESSE_KMP_DIR"
-}
-include(":tresse-kmp")
-project(":tresse-kmp").projectDir = tresseKmpDir

@@ -15,7 +15,7 @@ tasks.withType<KotlinCompile>().configureEach {
 
 dependencies {
     implementation(projects.shared)
-    implementation(projects.tresseKmp)
+    implementation(libs.tresse.kmp)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.compose.material3)
@@ -34,6 +34,18 @@ android {
     namespace = "com.akergez.shardkeep"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH")
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+            }
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+    }
+
     defaultConfig {
         applicationId = "com.akergez.shardkeep"
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -49,6 +61,7 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
