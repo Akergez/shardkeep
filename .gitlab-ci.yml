@@ -94,8 +94,11 @@ build:macos-arm64:
     - |
       APP_BUNDLE=$(find desktopApp/build/compose/binaries/main/app -maxdepth 1 -name '*.app' -print -quit)
       test -n "$APP_BUNDLE"
+      STAGING=$(mktemp -d)
+      ditto "$APP_BUNDLE" "$STAGING/$(basename "$APP_BUNDLE")"
+      ln -s /Applications "$STAGING/Applications"
       mkdir -p desktopApp/build/compose/binaries/main/dmg
-      hdiutil create -volname "Shardkeep" -srcfolder "$APP_BUNDLE" -ov -format UDZO desktopApp/build/compose/binaries/main/dmg/Shardkeep-1.0.0.dmg
+      hdiutil create -volname "Shardkeep" -srcfolder "$STAGING" -ov -format UDZO desktopApp/build/compose/binaries/main/dmg/Shardkeep-1.0.0.dmg
   artifacts:
     paths:
       - desktopApp/build/compose/binaries/main/dmg/*.dmg
