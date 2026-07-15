@@ -88,7 +88,15 @@ build:macos-arm64:
     - macos-arm64
   <<: [*gradle_cache, *tag_rules]
   before_script:
-    - export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+    - |
+      curl -L -o jdk.tar.gz \
+        https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.5_11.tar.gz
+      mkdir -p "$CI_PROJECT_DIR/.jdk"
+      tar -xzf jdk.tar.gz --strip-components=1 -C "$CI_PROJECT_DIR/.jdk"
+    - export JAVA_HOME="$CI_PROJECT_DIR/.jdk/Contents/Home"
+    - export PATH="$JAVA_HOME/bin:$PATH"
+    - java -version
+    - test "$(java -XshowSettings:properties -version 2>&1 | awk '/java.specification.version/ { print $3 }')" = "21"
   script:
     - ./gradlew --no-daemon :desktopApp:createDistributable
     - |
