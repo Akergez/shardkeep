@@ -251,7 +251,12 @@ class AndroidSafNotesDirectoryStorage(
                     mimeType == DocumentsContract.Document.MIME_TYPE_DIR ->
                         collectMarkdownFiles(docId, path, files, cache)
                     name.endsWith(".md", ignoreCase = true) ->
-                        files += NotesDirectoryFile(NotesDirectoryPath(path), FileVersion("$lastModified:$size"), size)
+                        files += NotesDirectoryFile(
+                            NotesDirectoryPath(path),
+                            FileVersion("$lastModified:$size"),
+                            size,
+                            modifiedAtMillis = lastModified,
+                        )
                 }
             }
         }
@@ -287,7 +292,12 @@ class AndroidSafNotesDirectoryStorage(
                 if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
                     collectAllFiles(docId, path, files, cache, isIgnored)
                 } else {
-                    files += NotesDirectoryFile(NotesDirectoryPath(path), FileVersion("$lastModified:$size"), size)
+                    files += NotesDirectoryFile(
+                        NotesDirectoryPath(path),
+                        FileVersion("$lastModified:$size"),
+                        size,
+                        modifiedAtMillis = lastModified,
+                    )
                 }
             }
         }

@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Shardkeep</string>
     <string name="new_task">Новая задача</string>
+    <string name="edit_task">Редактировать задачу</string>
     <string name="today">Сегодня</string>
     <string name="week">Неделя</string>
     <string name="no_tasks">Задач нет</string>
@@ -25,7 +26,11 @@
     <string name="task_save_error">Не удалось сохранить задачу</string>
     <string name="file_path">Путь к файлу</string>
     <string name="heading_optional">Заголовок (необязательно)</string>
-    <string name="due_date">Дата выполнения (ГГГГ-ММ-ДД)</string>
+    <string name="due_date">Срок выполнения</string>
+    <string name="scheduled_date">Запланировано на</string>
+    <string name="not_set">Не указано</string>
+    <string name="clear">Очистить</string>
+    <string name="ok">ОК</string>
     <string name="choose_existing_location">Выбрать существующее место</string>
     <string name="invalid_date">Введите корректную дату в формате ГГГГ-ММ-ДД</string>
     <string name="location_filter">Расположение</string>

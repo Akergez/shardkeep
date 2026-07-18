@@ -1,7 +1,7 @@
 package com.akergez.shardkeep.widget
 
 import android.content.Context
-import android.content.SharedPreferences
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -40,8 +40,6 @@ import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
 import com.akergez.shardkeep.R
 import com.akergez.shardkeep.domain.model.QuickNote
-import org.json.JSONArray
-import org.json.JSONObject
 
 data class WidgetChecklistItem(val index: Int, val text: String, val isChecked: Boolean)
 data class WidgetChecklist(val path: String, val title: String, val items: List<WidgetChecklistItem>)
@@ -56,11 +54,25 @@ class ChecklistWidget : GlanceAppWidget() {
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val prefs = context.getSharedPreferences("notes_directory", Context.MODE_PRIVATE)
-        val checklists = loadAll(prefs)
+        val initialChecklists = WidgetUpdater.loadNotes(context)
+            .filterIsInstance<QuickNote.Checklist>()
+            .map { checklist ->
+                WidgetChecklist(
+                    path = checklist.id.path,
+                    title = checklist.title,
+                    items = checklist.items.map { item ->
+                        WidgetChecklistItem(item.index, item.text, item.isChecked)
+                    },
+                )
+            }
+        Log.i("ShardkeepWidget", "Loaded initial checklist widget state with ${initialChecklists.size} checklists")
         provideContent {
             GlanceTheme {
                 val state = currentState<Preferences>()
+                val checklists = state[WidgetNoteState.CHECKLISTS]
+                    ?.let(WidgetNoteState::decodeChecklists)
+                    ?: initialChecklists
+                Log.i("ShardkeepWidget", "Rendering checklist widget with ${checklists.size} checklists")
                 val expanded = state[DROPDOWN_EXPANDED] ?: false
                 val selected = checklists.firstOrNull { it.path == state[SELECTED_PATH] }
                     ?: checklists.firstOrNull()
@@ -70,40 +82,6 @@ class ChecklistWidget : GlanceAppWidget() {
         }
     }
 
-    companion object {
-        const val PREF_CHECKLISTS = "widget_checklists"
-
-        fun saveAll(prefs: SharedPreferences, checklists: List<QuickNote.Checklist>) {
-            val array = JSONArray()
-            checklists.forEach { checklist ->
-                val items = JSONArray()
-                checklist.items.forEach { item ->
-                    items.put(JSONObject().put("c", item.isChecked).put("t", item.text))
-                }
-                array.put(
-                    JSONObject()
-                        .put("path", checklist.id.path)
-                        .put("title", checklist.title)
-                        .put("items", items)
-                )
-            }
-            prefs.edit().putString(PREF_CHECKLISTS, array.toString()).apply()
-        }
-
-        fun loadAll(prefs: SharedPreferences): List<WidgetChecklist> {
-            val raw = prefs.getString(PREF_CHECKLISTS, null) ?: return emptyList()
-            val array = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
-            return (0 until array.length()).mapNotNull { i ->
-                val obj = array.optJSONObject(i) ?: return@mapNotNull null
-                val itemsArray = obj.optJSONArray("items") ?: JSONArray()
-                val items = (0 until itemsArray.length()).map { j ->
-                    val io = itemsArray.optJSONObject(j) ?: JSONObject()
-                    WidgetChecklistItem(j, io.optString("t"), io.optBoolean("c"))
-                }
-                WidgetChecklist(obj.optString("path"), obj.optString("title"), items)
-            }
-        }
-    }
 }
 
 @Composable

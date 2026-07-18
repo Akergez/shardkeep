@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.akergez.shardkeep.R
 import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
+import com.akergez.shardkeep.widget.WidgetUpdater
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.safTresseVault
 
@@ -25,6 +26,7 @@ class TresseSyncWorker(
             SyncStatusHolder.store.begin(applicationContext.getString(R.string.sync_trigger_background))
             val vault = safTresseVault(applicationContext, treeUri) { ignoredPath(it, config) }
             val result = TresseSync(vault).perform(config, SyncStatusHolder.store.asProgress())
+            WidgetUpdater.refreshAll(applicationContext)
             SyncStatusHolder.store.finishOk(summaryOf(result), SyncStatusHolder.nowLabel())
             Result.success()
         } catch (error: Throwable) {

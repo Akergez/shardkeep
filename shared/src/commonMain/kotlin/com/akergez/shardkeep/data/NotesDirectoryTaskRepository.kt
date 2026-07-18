@@ -54,7 +54,7 @@ class NotesDirectoryTaskRepository(
                 async {
                     val cached = index[file.path]
                     file.path to if (cached?.listingVersion == file.version) {
-                        cached
+                        cached.copy(modifiedAtMillis = file.modifiedAtMillis)
                     } else {
                         readSemaphore.withPermit {
                             val document = storage.read(file.path)
@@ -63,6 +63,7 @@ class NotesDirectoryTaskRepository(
                                 listingVersion = file.version,
                                 tasks = parsedTasks,
                                 headings = headings,
+                                modifiedAtMillis = file.modifiedAtMillis,
                             )
                         }
                     }
@@ -79,9 +80,10 @@ class NotesDirectoryTaskRepository(
         return indexMutex.withLock {
             index.flatMap { (path, indexedFile) ->
             buildList {
-                    add(TaskDestination(path.value))
+                    val modifiedAt = indexedFile.modifiedAtMillis
+                    add(TaskDestination(path.value, modifiedAtMillis = modifiedAt))
                     indexedFile.headings.forEach { heading ->
-                        add(TaskDestination(path.value, heading))
+                        add(TaskDestination(path.value, heading, modifiedAt))
                     }
                 }
             }.distinct()
@@ -185,6 +187,21 @@ class NotesDirectoryTaskRepository(
         refresh()
     }
 
+    override suspend fun update(task: Task) {
+        val indexedTask = tasks.value.firstOrNull { it.id == task.id }
+            ?: throw NotesDirectoryException.InvalidDocument("Task is absent from the current index")
+        require(task.location.path == indexedTask.location.path) { "Moving tasks between files is not supported" }
+        val path = NotesDirectoryPath(indexedTask.location.path)
+        val document = storage.read(path)
+        val currentTask = parser.parse(path, document.content).firstOrNull {
+            it.location.sourceLine == indexedTask.location.sourceLine && it.title == indexedTask.title
+        } ?: throw NotesDirectoryException.Conflict(path)
+        val changed = patcher.replaceLine(document.content, currentTask, buildTaskLine(task))
+        storage.write(path, document.version, changed)
+        invalidate(path)
+        refresh()
+    }
+
     private fun buildTaskLine(task: Task): String = buildString {
         append("- [")
         append(if (task.status == TaskStatus.Done) 'x' else ' ')
@@ -236,6 +253,7 @@ class NotesDirectoryTaskRepository(
                 listingVersion = FileVersion(row.listing_version),
                 tasks = fileTasks,
                 headings = headings,
+                modifiedAtMillis = 0,
             )
         }
     }
@@ -279,5 +297,6 @@ class NotesDirectoryTaskRepository(
         val listingVersion: FileVersion,
         val tasks: List<Task>,
         val headings: List<String>,
+        val modifiedAtMillis: Long,
     )
 }

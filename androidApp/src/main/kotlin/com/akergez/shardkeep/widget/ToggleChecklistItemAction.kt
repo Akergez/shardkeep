@@ -10,7 +10,6 @@ import com.akergez.shardkeep.data.NotesDirectoryQuickNoteRepository
 import com.akergez.shardkeep.domain.model.QuickNote
 import com.akergez.shardkeep.domain.model.QuickNoteId
 import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
-import kotlinx.coroutines.flow.first
 
 class ToggleChecklistItemAction : ActionCallback {
     companion object {
@@ -37,8 +36,6 @@ class ToggleChecklistItemAction : ActionCallback {
             repo.setChecklistItem(QuickNoteId(notePath), itemIndex, isChecked)
         }
 
-        val notes = runCatching { repo.observeNotes().first() }.getOrElse { emptyList() }
-        ChecklistWidget.saveAll(prefs, notes.filterIsInstance<QuickNote.Checklist>())
-        ChecklistWidget().updateAll(context)
+        WidgetUpdater.publishNotes(context)
     }
 }

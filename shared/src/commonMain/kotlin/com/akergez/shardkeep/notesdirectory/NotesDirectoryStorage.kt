@@ -16,6 +16,7 @@ data class NotesDirectoryFile(
     val path: NotesDirectoryPath,
     val version: FileVersion,
     val size: Long,
+    val modifiedAtMillis: Long = 0,
 )
 
 data class NotesDirectoryDocument(

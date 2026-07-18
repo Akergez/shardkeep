@@ -1,7 +1,6 @@
 package com.akergez.shardkeep.widget
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,18 +28,20 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.akergez.shardkeep.R
 import com.akergez.shardkeep.domain.model.QuickNote
-import org.json.JSONArray
-import org.json.JSONObject
 
 data class WidgetNote(val path: String, val title: String, val content: String)
 
 class QuickNoteWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val prefs = context.getSharedPreferences("notes_directory", Context.MODE_PRIVATE)
-        val notes = loadAll(prefs)
+        val initialNotes = WidgetUpdater.loadNotes(context)
+            .filterIsInstance<QuickNote.Text>()
+            .map { WidgetNote(it.id.path, it.title, it.content) }
         provideContent {
             GlanceTheme {
                 val state = currentState<Preferences>()
+                val notes = state[WidgetNoteState.NOTES]
+                    ?.let(WidgetNoteState::decodeNotes)
+                    ?: initialNotes
                 val expanded = state[DROPDOWN_EXPANDED] ?: false
                 val selected = notes.firstOrNull { it.path == state[SELECTED_PATH] }
                     ?: notes.firstOrNull()
@@ -49,31 +50,6 @@ class QuickNoteWidget : GlanceAppWidget() {
         }
     }
 
-    companion object {
-        const val PREF_NOTES = "widget_notes"
-
-        fun saveAll(prefs: SharedPreferences, notes: List<QuickNote.Text>) {
-            val array = JSONArray()
-            notes.forEach { note ->
-                array.put(
-                    JSONObject()
-                        .put("path", note.id.path)
-                        .put("title", note.title)
-                        .put("content", note.content)
-                )
-            }
-            prefs.edit().putString(PREF_NOTES, array.toString()).apply()
-        }
-
-        fun loadAll(prefs: SharedPreferences): List<WidgetNote> {
-            val raw = prefs.getString(PREF_NOTES, null) ?: return emptyList()
-            val array = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
-            return (0 until array.length()).mapNotNull { i ->
-                val obj = array.optJSONObject(i) ?: return@mapNotNull null
-                WidgetNote(obj.optString("path"), obj.optString("title"), obj.optString("content"))
-            }
-        }
-    }
 }
 
 @Composable

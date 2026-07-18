@@ -18,11 +18,14 @@ interface TaskRepository {
     suspend fun setScheduledDate(id: TaskId, date: CalendarDate) = Unit
 
     suspend fun create(task: Task)
+
+    suspend fun update(task: Task) = Unit
 }
 
 data class TaskDestination(
     val path: String,
     val heading: String? = null,
+    val modifiedAtMillis: Long = 0,
 )
 
 interface TaskDestinationProvider {

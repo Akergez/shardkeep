@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -46,13 +48,18 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TopAppBar
@@ -104,6 +111,7 @@ import shardkeep.shared.generated.resources.ic_add
 import shardkeep.shared.generated.resources.ic_arrow_back
 import shardkeep.shared.generated.resources.ic_article
 import shardkeep.shared.generated.resources.ic_delete
+import shardkeep.shared.generated.resources.ic_edit
 import shardkeep.shared.generated.resources.ic_calendar_today
 import shardkeep.shared.generated.resources.ic_event
 import shardkeep.shared.generated.resources.ic_event_available
@@ -118,6 +126,7 @@ import shardkeep.shared.generated.resources.connect_notes_directory
 import shardkeep.shared.generated.resources.connect_notes_directory_description
 import shardkeep.shared.generated.resources.create
 import shardkeep.shared.generated.resources.default_tasks_heading
+import shardkeep.shared.generated.resources.edit_task
 import shardkeep.shared.generated.resources.demo_check_ui
 import shardkeep.shared.generated.resources.demo_connect_notes_directory
 import shardkeep.shared.generated.resources.indexing_notes_directory
@@ -132,6 +141,10 @@ import shardkeep.shared.generated.resources.notes_directory_open_error_descripti
 import shardkeep.shared.generated.resources.week
 import shardkeep.shared.generated.resources.choose_existing_location
 import shardkeep.shared.generated.resources.due_date
+import shardkeep.shared.generated.resources.scheduled_date
+import shardkeep.shared.generated.resources.not_set
+import shardkeep.shared.generated.resources.clear
+import shardkeep.shared.generated.resources.ok
 import shardkeep.shared.generated.resources.file_path
 import shardkeep.shared.generated.resources.heading_optional
 import shardkeep.shared.generated.resources.invalid_date
@@ -314,6 +327,10 @@ fun ShardkeepApp(
     var pendingStatusOverrides by remember { mutableStateOf(mapOf<TaskId, TaskStatus>()) }
     var pendingScheduledDateOverrides by remember { mutableStateOf(mapOf<TaskId, CalendarDate>()) }
     var noteToDelete by remember { mutableStateOf<QuickNote?>(null) }
+    var allTaskFiles by remember { mutableStateOf<List<TaskDestination>>(emptyList()) }
+    var focusedAllTasksPath by remember { mutableStateOf<String?>(null) }
+    var createTaskPathOverride by remember { mutableStateOf<String?>(null) }
+    var editingTask by remember { mutableStateOf<Task?>(null) }
     val refreshCompleteMessage = stringResource(Res.string.refresh_complete)
     val refreshErrorMessage = stringResource(Res.string.refresh_error)
     val taskSaveErrorMessage = stringResource(Res.string.task_save_error)
@@ -345,6 +362,22 @@ fun ShardkeepApp(
             }
         }
         onDeepLinkHandled()
+    }
+
+    LaunchedEffect(section, allTasks) {
+        if (section != AppSection.AllTasks) return@LaunchedEffect
+        val destinations = runCatching {
+            (repository as? TaskDestinationProvider)?.listDestinations().orEmpty()
+        }.getOrDefault(emptyList())
+        val modifiedByPath = destinations.groupBy { it.path }
+            .mapValues { (_, values) -> values.maxOfOrNull { it.modifiedAtMillis } ?: 0L }
+        allTaskFiles = allTasks.asSequence()
+            .filter { it.status == TaskStatus.Todo }
+            .map { it.location.path }
+            .distinct()
+            .sortedWith(compareByDescending<String> { modifiedByPath[it] ?: 0L }.thenBy { it })
+            .map { TaskDestination(it, modifiedAtMillis = modifiedByPath[it] ?: 0L) }
+            .toList()
     }
 
     val currentEditorTarget = noteEditorTarget
@@ -390,6 +423,17 @@ fun ShardkeepApp(
                         contentDescription = stringResource(Res.string.new_task),
                     )
                 }
+                AppSection.AllTasks -> focusedAllTasksPath?.let { path ->
+                    FloatingActionButton(onClick = {
+                        createTaskPathOverride = path
+                        showCreateDialog = true
+                    }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_add),
+                            contentDescription = stringResource(Res.string.new_task),
+                        )
+                    }
+                }
                 AppSection.Notes -> if (quickNoteRepository != null) {
                     FloatingActionButton(onClick = { showNoteTypePicker = true }) {
                         Icon(
@@ -398,7 +442,7 @@ fun ShardkeepApp(
                         )
                     }
                 }
-                AppSection.AllTasks, AppSection.Settings -> {}
+                AppSection.Settings -> {}
             }
         },
         bottomBar = {
@@ -481,6 +525,7 @@ fun ShardkeepApp(
                                     val effectiveStatus = pendingStatusOverrides[task.id] ?: task.status
                                     TaskRow(
                                         task = task.copy(status = effectiveStatus),
+                                        onEdit = { editingTask = task },
                                         onCheckedChange = { checked ->
                                             handleStatusChange(task.id, checked, scope, repository, taskSaveErrorMessage, snackbarHostState,
                                                 onAddPending = { id, status -> pendingStatusOverrides = pendingStatusOverrides + (id to status) },
@@ -498,6 +543,7 @@ fun ShardkeepApp(
                                 val effectiveStatus = pendingStatusOverrides[task.id] ?: task.status
                                 TaskRow(
                                     task = task.copy(status = effectiveStatus),
+                                    onEdit = { editingTask = task },
                                     onCheckedChange = { checked ->
                                         handleStatusChange(task.id, checked, scope, repository, taskSaveErrorMessage, snackbarHostState,
                                             onAddPending = { id, status -> pendingStatusOverrides = pendingStatusOverrides + (id to status) },
@@ -520,6 +566,7 @@ fun ShardkeepApp(
                                     val effectiveStatus = pendingStatusOverrides[task.id] ?: task.status
                                     TaskRow(
                                         task = task.copy(status = effectiveStatus),
+                                        onEdit = { editingTask = task },
                                         onCheckedChange = { checked ->
                                             handleStatusChange(task.id, checked, scope, repository, taskSaveErrorMessage, snackbarHostState,
                                                 onAddPending = { id, status -> pendingStatusOverrides = pendingStatusOverrides + (id to status) },
@@ -538,6 +585,8 @@ fun ShardkeepApp(
                     val scheduleTodayLabel = stringResource(Res.string.schedule_today)
                     AllTasksContent(
                         tasks = allTasks.filter { it.status == TaskStatus.Todo },
+                        files = allTaskFiles,
+                        focusedFilePath = focusedAllTasksPath,
                         today = today,
                         pendingStatusOverrides = pendingStatusOverrides,
                         pendingScheduledDateOverrides = pendingScheduledDateOverrides,
@@ -559,6 +608,8 @@ fun ShardkeepApp(
                                     }
                             }
                         },
+                        onEdit = { editingTask = it },
+                        onFocusedFileChange = { focusedAllTasksPath = it },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -585,33 +636,54 @@ fun ShardkeepApp(
         }
     }
 
-    if (showCreateDialog) {
+    val taskBeingEdited = editingTask
+    if (showCreateDialog || taskBeingEdited != null) {
         CreateTaskDialog(
             destinationProvider = repository as? TaskDestinationProvider,
-            defaultPath = lastUsedPath,
-            defaultHeading = lastUsedHeading.ifEmpty { defaultTasksHeading },
-            defaultDate = today,
-            onDismiss = { showCreateDialog = false },
+            defaultPath = taskBeingEdited?.location?.path ?: createTaskPathOverride ?: lastUsedPath,
+            defaultHeading = taskBeingEdited?.location?.heading.orEmpty().ifEmpty {
+                if (createTaskPathOverride != null) "" else lastUsedHeading.ifEmpty { defaultTasksHeading }
+            },
+            fixedPath = taskBeingEdited?.location?.path ?: createTaskPathOverride,
+            defaultDate = taskBeingEdited?.dueDate ?: today,
+            initialTask = taskBeingEdited,
+            onDismiss = {
+                showCreateDialog = false
+                createTaskPathOverride = null
+                editingTask = null
+            },
             onCreate = { draft ->
                 scope.launch {
                     runCatching {
-                        repository.create(
-                            Task(
+                        if (taskBeingEdited == null) {
+                            repository.create(Task(
                                 id = TaskId("task-${draft.dueDate}-${draft.title}-${tasks.size}"),
                                 title = draft.title,
                                 status = TaskStatus.Todo,
                                 dueDate = draft.dueDate,
+                                scheduledDate = draft.scheduledDate,
                                 priority = draft.priority,
                                 location = NotesDirectoryLocation(
                                     draft.path,
                                     draft.heading,
                                 ),
-                            ),
-                        )
+                            ))
+                        } else {
+                            repository.update(
+                                taskBeingEdited.copy(
+                                    title = draft.title,
+                                    dueDate = draft.dueDate,
+                                    scheduledDate = draft.scheduledDate,
+                                    priority = draft.priority,
+                                ),
+                            )
+                        }
                     }.onSuccess {
                         lastUsedPath = draft.path
                         lastUsedHeading = draft.heading.orEmpty()
                         showCreateDialog = false
+                        createTaskPathOverride = null
+                        editingTask = null
                     }.onFailure {
                         snackbarHostState.showSnackbar(taskSaveErrorMessage)
                     }
@@ -693,44 +765,76 @@ private fun handleStatusChange(
 @Composable
 private fun AllTasksContent(
     tasks: List<Task>,
+    files: List<TaskDestination>,
+    focusedFilePath: String?,
     today: CalendarDate,
     pendingStatusOverrides: Map<TaskId, TaskStatus>,
     pendingScheduledDateOverrides: Map<TaskId, CalendarDate>,
     scheduleTodayLabel: String,
     onCheckedChange: (Task, Boolean) -> Unit,
     onScheduleToday: (Task) -> Unit,
+    onEdit: (Task) -> Unit,
+    onFocusedFileChange: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (tasks.isEmpty()) {
+    if (files.isEmpty()) {
+        LaunchedEffect(Unit) { onFocusedFileChange(null) }
         EmptyTasks(modifier = modifier)
         return
     }
-    val grouped = remember(tasks) {
-        tasks.groupBy { it.location.path }.entries.sortedBy { it.key }
+    val tasksByPath = remember(tasks) { tasks.groupBy { it.location.path } }
+    val pagerState = rememberPagerState(initialPage = 0) { files.size }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(files, focusedFilePath) {
+        val preservedPage = files.indexOfFirst { it.path == focusedFilePath }
+        if (preservedPage >= 0 && preservedPage != pagerState.currentPage) {
+            pagerState.scrollToPage(preservedPage)
+        }
     }
-    LazyColumn(modifier = modifier, contentPadding = PaddingValues(bottom = 96.dp)) {
-        grouped.forEach { (path, fileTasks) ->
-            item(key = "header_$path") {
-                Text(
-                    text = path.substringAfterLast('/').removeSuffix(".md"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+    LaunchedEffect(pagerState.currentPage, files) {
+        onFocusedFileChange(files.getOrNull(pagerState.currentPage)?.path)
+    }
+
+    Column(modifier = modifier) {
+        ScrollableTabRow(selectedTabIndex = pagerState.currentPage) {
+            files.forEachIndexed { index, file ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    text = { Text(file.path.substringAfterLast('/').removeSuffix(".md")) },
                 )
             }
-            items(fileTasks, key = { it.id.value }) { task ->
-                val effectiveTask = task.copy(
-                    status = pendingStatusOverrides[task.id] ?: task.status,
-                    scheduledDate = pendingScheduledDateOverrides[task.id] ?: task.scheduledDate,
-                )
-                AllTaskRow(
-                    task = effectiveTask,
-                    today = today,
-                    scheduleTodayLabel = scheduleTodayLabel,
-                    onCheckedChange = { checked -> onCheckedChange(task, checked) },
-                    onScheduleToday = { onScheduleToday(task) },
-                )
-                HorizontalDivider()
+        }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            key = { files[it].path },
+        ) { page ->
+            val fileTasks = tasksByPath[files[page].path].orEmpty()
+            if (fileTasks.isEmpty()) {
+                EmptyTasks(modifier = Modifier.fillMaxSize())
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 96.dp),
+                ) {
+                    items(fileTasks, key = { it.id.value }) { task ->
+                        val effectiveTask = task.copy(
+                            status = pendingStatusOverrides[task.id] ?: task.status,
+                            scheduledDate = pendingScheduledDateOverrides[task.id] ?: task.scheduledDate,
+                        )
+                        AllTaskRow(
+                            task = effectiveTask,
+                            today = today,
+                            scheduleTodayLabel = scheduleTodayLabel,
+                            onCheckedChange = { checked -> onCheckedChange(task, checked) },
+                            onScheduleToday = { onScheduleToday(task) },
+                            onEdit = { onEdit(task) },
+                        )
+                        HorizontalDivider()
+                    }
+                }
             }
         }
     }
@@ -743,6 +847,7 @@ private fun AllTaskRow(
     scheduleTodayLabel: String,
     onCheckedChange: (Boolean) -> Unit,
     onScheduleToday: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -774,6 +879,12 @@ private fun AllTaskRow(
                     contentDescription = scheduleTodayLabel,
                 )
             }
+        }
+        IconButton(onClick = onEdit) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_edit),
+                contentDescription = stringResource(Res.string.edit_task),
+            )
         }
     }
 }
@@ -1720,6 +1831,7 @@ private fun CircleCheckbox(
 private fun TaskRow(
     task: Task,
     onCheckedChange: (Boolean) -> Unit,
+    onEdit: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -1744,6 +1856,12 @@ private fun TaskRow(
             )
             TaskAttributes(task = task, showLocation = true)
         }
+        IconButton(onClick = onEdit) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_edit),
+                contentDescription = stringResource(Res.string.edit_task),
+            )
+        }
     }
 }
 
@@ -1760,23 +1878,28 @@ private fun EmptyTasks(modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateTaskDialog(
     destinationProvider: TaskDestinationProvider?,
     defaultPath: String,
     defaultHeading: String,
+    fixedPath: String? = null,
     defaultDate: CalendarDate,
+    initialTask: Task? = null,
     onDismiss: () -> Unit,
     onCreate: (TaskDraft) -> Unit,
 ) {
-    var title by rememberSaveable { mutableStateOf("") }
+    var title by rememberSaveable { mutableStateOf(initialTask?.title.orEmpty()) }
     var path by rememberSaveable { mutableStateOf(defaultPath) }
     var heading by rememberSaveable { mutableStateOf(defaultHeading) }
-    var dueDateText by rememberSaveable { mutableStateOf(defaultDate.toString()) }
-    var priority by rememberSaveable { mutableStateOf(TaskPriority.Normal) }
+    var dueDate by remember { mutableStateOf(defaultDate) }
+    var scheduledDate by remember { mutableStateOf(initialTask?.scheduledDate) }
+    var pickingDueDate by remember { mutableStateOf(false) }
+    var pickingScheduledDate by remember { mutableStateOf(false) }
+    var priority by rememberSaveable { mutableStateOf(initialTask?.priority ?: TaskPriority.Normal) }
     var destinations by remember { mutableStateOf<List<TaskDestination>>(emptyList()) }
     var destinationMenuExpanded by remember { mutableStateOf(false) }
-    val parsedDate = remember(dueDateText) { parseCalendarDate(dueDateText) }
 
     LaunchedEffect(destinationProvider) {
         destinations = runCatching { destinationProvider?.listDestinations().orEmpty() }
@@ -1785,7 +1908,9 @@ private fun CreateTaskDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.new_task)) },
+        title = {
+            Text(stringResource(if (initialTask == null) Res.string.new_task else Res.string.edit_task))
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -1795,7 +1920,7 @@ private fun CreateTaskDialog(
                     label = { Text(stringResource(Res.string.task_title_label)) },
                     singleLine = true,
                 )
-                if (destinations.isNotEmpty()) {
+                if (fixedPath == null && destinations.isNotEmpty()) {
                     Box {
                         TextButton(onClick = { destinationMenuExpanded = true }) {
                             Text(stringResource(Res.string.choose_existing_location))
@@ -1822,13 +1947,20 @@ private fun CreateTaskDialog(
                         }
                     }
                 }
-                OutlinedTextField(
-                    value = path,
-                    onValueChange = { path = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(Res.string.file_path)) },
-                    singleLine = true,
-                )
+                if (fixedPath == null) {
+                    OutlinedTextField(
+                        value = path,
+                        onValueChange = { path = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(Res.string.file_path)) },
+                        singleLine = true,
+                    )
+                } else {
+                    Text(
+                        text = fixedPath.substringAfterLast('/').removeSuffix(".md"),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
                 OutlinedTextField(
                     value = heading,
                     onValueChange = { heading = it },
@@ -1858,41 +1990,117 @@ private fun CreateTaskDialog(
                         label = { Text(stringResource(Res.string.priority_high)) },
                     )
                 }
-                OutlinedTextField(
-                    value = dueDateText,
-                    onValueChange = { dueDateText = it },
+                OutlinedButton(
+                    onClick = { pickingDueDate = true },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(Res.string.due_date)) },
-                    supportingText = {
-                        if (dueDateText.isNotBlank() && parsedDate == null) {
-                            Text(stringResource(Res.string.invalid_date))
+                ) { Text("${stringResource(Res.string.due_date)}: $dueDate") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = { pickingScheduledDate = true },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            "${stringResource(Res.string.scheduled_date)}: " +
+                                (scheduledDate?.toString() ?: stringResource(Res.string.not_set)),
+                        )
+                    }
+                    if (scheduledDate != null) {
+                        TextButton(onClick = { scheduledDate = null }) {
+                            Text(stringResource(Res.string.clear))
                         }
-                    },
-                    isError = dueDateText.isNotBlank() && parsedDate == null,
-                    singleLine = true,
-                )
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = title.isNotBlank() && path.isNotBlank() && parsedDate != null,
+                enabled = title.isNotBlank() && path.isNotBlank(),
                 onClick = {
                     onCreate(
                         TaskDraft(
                             title = title.trim(),
                             path = normalizeMarkdownPath(path),
                             heading = heading.trim().ifEmpty { null },
-                            dueDate = checkNotNull(parsedDate),
+                            dueDate = dueDate,
+                            scheduledDate = scheduledDate,
                             priority = priority,
                         ),
                     )
                 },
-            ) { Text(stringResource(Res.string.create)) }
+            ) { Text(stringResource(if (initialTask == null) Res.string.create else Res.string.save)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
         },
     )
+    if (pickingDueDate) {
+        CalendarDatePickerDialog(
+            initialDate = dueDate,
+            onDismiss = { pickingDueDate = false },
+            onSelect = { dueDate = it; pickingDueDate = false },
+        )
+    }
+    if (pickingScheduledDate) {
+        CalendarDatePickerDialog(
+            initialDate = scheduledDate ?: dueDate,
+            onDismiss = { pickingScheduledDate = false },
+            onSelect = { scheduledDate = it; pickingScheduledDate = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CalendarDatePickerDialog(
+    initialDate: CalendarDate,
+    onDismiss: () -> Unit,
+    onSelect: (CalendarDate) -> Unit,
+) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialDate.toEpochMillis())
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = state.selectedDateMillis != null,
+                onClick = { state.selectedDateMillis?.let { onSelect(calendarDateFromEpochMillis(it)) } },
+            ) { Text(stringResource(Res.string.ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
+        },
+    ) {
+        DatePicker(state = state)
+    }
+}
+
+private const val MILLIS_PER_DAY = 86_400_000L
+
+private fun CalendarDate.toEpochMillis(): Long {
+    val adjustedYear = year - if (month <= 2) 1 else 0
+    val era = adjustedYear / 400
+    val yearOfEra = adjustedYear - era * 400
+    val adjustedMonth = month + if (month > 2) -3 else 9
+    val dayOfYear = (153 * adjustedMonth + 2) / 5 + day - 1
+    val dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
+    return (era * 146097L + dayOfEra - 719468L) * MILLIS_PER_DAY
+}
+
+private fun calendarDateFromEpochMillis(millis: Long): CalendarDate {
+    val zeroDay = millis / MILLIS_PER_DAY + 719468L
+    val era = if (zeroDay >= 0) zeroDay / 146097 else (zeroDay - 146096) / 146097
+    val dayOfEra = zeroDay - era * 146097
+    val yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096) / 365
+    var year = (yearOfEra + era * 400).toInt()
+    val dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+    val monthPrime = (5 * dayOfYear + 2) / 153
+    val day = (dayOfYear - (153 * monthPrime + 2) / 5 + 1).toInt()
+    val month = (monthPrime + if (monthPrime < 10) 3 else -9).toInt()
+    year += if (month <= 2) 1 else 0
+    return CalendarDate(year, month, day)
 }
 
 private data class TaskDraft(
@@ -1900,6 +2108,7 @@ private data class TaskDraft(
     val path: String,
     val heading: String?,
     val dueDate: CalendarDate,
+    val scheduledDate: CalendarDate? = null,
     val priority: TaskPriority = TaskPriority.Normal,
 )
 

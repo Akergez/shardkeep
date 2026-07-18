@@ -39,6 +39,8 @@ import com.akergez.shardkeep.widget.ChecklistWidget
 import com.akergez.shardkeep.widget.QuickNoteWidget
 import com.akergez.shardkeep.widget.TaskWidget
 import com.akergez.shardkeep.widget.WidgetNavigation
+import com.akergez.shardkeep.widget.WidgetUpdatingQuickNoteRepository
+import com.akergez.shardkeep.widget.WidgetUpdatingTaskRepository
 import com.akergez.shardkeep.sync.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
 import com.akergez.tresse.kmp.TresseSync
@@ -159,8 +161,12 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
     val database = remember { createDatabase(DatabaseDriverFactory(applicationContext)) }
     val storage = remember(uri) { AndroidSafNotesDirectoryStorage(applicationContext, uri) }
     var syncConfig by remember(storage) { mutableStateOf<TresseConfig?>(null) }
-    val repository = remember(storage, format) { NotesDirectoryTaskRepository(storage, format, database = database) }
-    val quickNoteRepository = remember(storage, quickNotesFolder) { NotesDirectoryQuickNoteRepository(storage, quickNotesFolder) }
+    val taskSource = remember(storage, format) { NotesDirectoryTaskRepository(storage, format, database = database) }
+    val repository = remember(taskSource) { WidgetUpdatingTaskRepository(taskSource, applicationContext) }
+    val quickNoteSource = remember(storage, quickNotesFolder) { NotesDirectoryQuickNoteRepository(storage, quickNotesFolder) }
+    val quickNoteRepository = remember(quickNoteSource) {
+        WidgetUpdatingQuickNoteRepository(quickNoteSource, applicationContext)
+    }
     var loadError by remember(repository) { mutableStateOf(false) }
     var refreshKey by remember(repository) { mutableStateOf(0) }
     val today = remember { currentLocalDate() }
@@ -185,19 +191,11 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(repository, refreshKey) {
+    LaunchedEffect(repository, quickNoteRepository, refreshKey) {
         loadError = false
         runCatching {
             repository.refresh()
             quickNoteRepository.refresh()
-
-            val notes = quickNoteRepository.observeNotes().first()
-            QuickNoteWidget.saveAll(preferences, notes.filterIsInstance<QuickNote.Text>())
-            ChecklistWidget.saveAll(preferences, notes.filterIsInstance<QuickNote.Checklist>())
-
-            TaskWidget().updateAll(applicationContext)
-            QuickNoteWidget().updateAll(applicationContext)
-            ChecklistWidget().updateAll(applicationContext)
         }.onFailure { e ->
             if (e is kotlinx.coroutines.CancellationException) throw e
             loadError = true

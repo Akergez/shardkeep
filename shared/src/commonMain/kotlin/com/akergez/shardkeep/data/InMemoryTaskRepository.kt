@@ -35,4 +35,8 @@ class InMemoryTaskRepository(initialTasks: List<Task> = emptyList()) : TaskRepos
     override suspend fun create(task: Task) {
         tasks.update { current -> current + task }
     }
+
+    override suspend fun update(task: Task) {
+        tasks.update { current -> current.map { if (it.id == task.id) task else it } }
+    }
 }
