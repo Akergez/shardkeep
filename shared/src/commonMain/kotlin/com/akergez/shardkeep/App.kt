@@ -898,7 +898,7 @@ private fun AllTasksContent(
                 Tab(
                     selected = pagerState.currentPage == index,
                     onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                    text = { Text(file.path.substringAfterLast('/').removeSuffix(".md")) },
+                    text = { Text(file.path) },
                 )
             }
         }
