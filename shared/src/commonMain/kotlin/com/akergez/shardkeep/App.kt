@@ -10,11 +10,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
@@ -53,6 +55,8 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
@@ -285,6 +289,64 @@ data class SettingsCallbacks(
 
 private enum class AppSection { Tasks, AllTasks, Notes, Settings }
 
+@Composable
+private fun AppNavigationBar(
+    section: AppSection,
+    showNotes: Boolean,
+    onSectionChange: (AppSection) -> Unit,
+) {
+    NavigationBar {
+        AppNavigationDestinations(
+            showNotes = showNotes,
+            item = { destination, icon, label ->
+                NavigationBarItem(
+                    selected = section == destination,
+                    onClick = { onSectionChange(destination) },
+                    icon = { Icon(painterResource(icon), contentDescription = null) },
+                    label = { Text(stringResource(label)) },
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun AppNavigationRail(
+    section: AppSection,
+    showNotes: Boolean,
+    onSectionChange: (AppSection) -> Unit,
+) {
+    NavigationRail {
+        Column(
+            modifier = Modifier.fillMaxHeight(),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            AppNavigationDestinations(
+                showNotes = showNotes,
+                item = { destination, icon, label ->
+                    NavigationRailItem(
+                        selected = section == destination,
+                        onClick = { onSectionChange(destination) },
+                        icon = { Icon(painterResource(icon), contentDescription = null) },
+                        label = { Text(stringResource(label)) },
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppNavigationDestinations(
+    showNotes: Boolean,
+    item: @Composable (AppSection, org.jetbrains.compose.resources.DrawableResource, org.jetbrains.compose.resources.StringResource) -> Unit,
+) {
+    item(AppSection.Tasks, Res.drawable.ic_calendar_today, Res.string.tasks)
+    item(AppSection.AllTasks, Res.drawable.ic_format_list, Res.string.all_tasks)
+    if (showNotes) item(AppSection.Notes, Res.drawable.ic_article, Res.string.quick_notes)
+    item(AppSection.Settings, Res.drawable.ic_settings, Res.string.settings)
+}
+
 private sealed interface NoteEditorTarget {
     data object NewText : NoteEditorTarget
     data object NewChecklist : NoteEditorTarget
@@ -391,7 +453,18 @@ fun ShardkeepApp(
         return
     }
 
-    Scaffold(
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val useNavigationRail = maxWidth > maxHeight
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (useNavigationRail) {
+                AppNavigationRail(
+                    section = section,
+                    showNotes = quickNoteRepository != null,
+                    onSectionChange = { section = it },
+                )
+            }
+            Scaffold(
+                modifier = Modifier.weight(1f),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(Res.string.app_name)) },
@@ -446,32 +519,11 @@ fun ShardkeepApp(
             }
         },
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = section == AppSection.Tasks,
-                    onClick = { section = AppSection.Tasks },
-                    icon = { Icon(painter = painterResource(Res.drawable.ic_calendar_today), contentDescription = null) },
-                    label = { Text(stringResource(Res.string.tasks)) },
-                )
-                NavigationBarItem(
-                    selected = section == AppSection.AllTasks,
-                    onClick = { section = AppSection.AllTasks },
-                    icon = { Icon(painter = painterResource(Res.drawable.ic_format_list), contentDescription = null) },
-                    label = { Text(stringResource(Res.string.all_tasks)) },
-                )
-                if (quickNoteRepository != null) {
-                    NavigationBarItem(
-                        selected = section == AppSection.Notes,
-                        onClick = { section = AppSection.Notes },
-                        icon = { Icon(painter = painterResource(Res.drawable.ic_article), contentDescription = null) },
-                        label = { Text(stringResource(Res.string.quick_notes)) },
-                    )
-                }
-                NavigationBarItem(
-                    selected = section == AppSection.Settings,
-                    onClick = { section = AppSection.Settings },
-                    icon = { Icon(painter = painterResource(Res.drawable.ic_settings), contentDescription = null) },
-                    label = { Text(stringResource(Res.string.settings)) },
+            if (!useNavigationRail) {
+                AppNavigationBar(
+                    section = section,
+                    showNotes = quickNoteRepository != null,
+                    onSectionChange = { section = it },
                 )
             }
         },
@@ -632,6 +684,8 @@ fun ShardkeepApp(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
+            }
+        }
             }
         }
     }
