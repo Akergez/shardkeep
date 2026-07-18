@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -81,8 +82,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -1676,6 +1681,23 @@ private fun NoteEditorScreen(
             }
         }
     }
+    val newItemFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var focusNewItem by remember { mutableStateOf(false) }
+
+    LaunchedEffect(items.size, focusNewItem) {
+        if (focusNewItem && items.isNotEmpty()) {
+            newItemFocusRequester.requestFocus()
+            keyboardController?.show()
+            focusNewItem = false
+        }
+    }
+
+    fun addChecklistItem() {
+        val nextIndex = (items.maxOfOrNull { it.index } ?: -1) + 1
+        items.add(ChecklistItem(index = nextIndex, text = "", isChecked = false))
+        focusNewItem = true
+    }
 
     val canSave = !saving && title.isNotBlank() &&
         if (isChecklist) items.any { it.text.isNotBlank() } else content.isNotBlank()
@@ -1758,8 +1780,15 @@ private fun NoteEditorScreen(
                         TextField(
                             value = item.text,
                             onValueChange = { text -> items[index] = item.copy(text = text) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(
+                                    if (index == items.lastIndex) Modifier.focusRequester(newItemFocusRequester)
+                                    else Modifier
+                                ),
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { addChecklistItem() }),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
@@ -1781,7 +1810,7 @@ private fun NoteEditorScreen(
                     HorizontalDivider(modifier = Modifier.padding(start = 48.dp))
                 }
                 TextButton(
-                    onClick = { items.add(ChecklistItem(index = items.size, text = "", isChecked = false)) },
+                    onClick = { addChecklistItem() },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(painterResource(Res.drawable.ic_add), contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1989,7 +2018,9 @@ private fun CreateTaskDialog(
     var title by rememberSaveable { mutableStateOf(initialTask?.title.orEmpty()) }
     var path by rememberSaveable { mutableStateOf(defaultPath) }
     var heading by rememberSaveable { mutableStateOf(defaultHeading) }
-    var dueDate by remember { mutableStateOf(defaultDate) }
+    var dueDate by remember {
+        mutableStateOf(initialTask?.dueDate ?: if (initialTask == null) defaultDate else null)
+    }
     var scheduledDate by remember { mutableStateOf(initialTask?.scheduledDate) }
     var pickingDueDate by remember { mutableStateOf(false) }
     var pickingScheduledDate by remember { mutableStateOf(false) }
@@ -2086,10 +2117,26 @@ private fun CreateTaskDialog(
                         label = { Text(stringResource(Res.string.priority_high)) },
                     )
                 }
-                OutlinedButton(
-                    onClick = { pickingDueDate = true },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("${stringResource(Res.string.due_date)}: $dueDate") }
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = { pickingDueDate = true },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            "${stringResource(Res.string.due_date)}: " +
+                                (dueDate?.toString() ?: stringResource(Res.string.not_set)),
+                        )
+                    }
+                    if (dueDate != null) {
+                        TextButton(onClick = { dueDate = null }) {
+                            Text(stringResource(Res.string.clear))
+                        }
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2135,14 +2182,14 @@ private fun CreateTaskDialog(
     )
     if (pickingDueDate) {
         CalendarDatePickerDialog(
-            initialDate = dueDate,
+            initialDate = dueDate ?: scheduledDate ?: defaultDate,
             onDismiss = { pickingDueDate = false },
             onSelect = { dueDate = it; pickingDueDate = false },
         )
     }
     if (pickingScheduledDate) {
         CalendarDatePickerDialog(
-            initialDate = scheduledDate ?: dueDate,
+            initialDate = scheduledDate ?: dueDate ?: defaultDate,
             onDismiss = { pickingScheduledDate = false },
             onSelect = { scheduledDate = it; pickingScheduledDate = false },
         )
@@ -2203,7 +2250,7 @@ private data class TaskDraft(
     val title: String,
     val path: String,
     val heading: String?,
-    val dueDate: CalendarDate,
+    val dueDate: CalendarDate?,
     val scheduledDate: CalendarDate? = null,
     val priority: TaskPriority = TaskPriority.Normal,
 )

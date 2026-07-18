@@ -6,6 +6,15 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+val applicationVersion = providers.environmentVariable("APP_VERSION")
+    .orElse(providers.environmentVariable("CI_COMMIT_TAG"))
+    .map { raw ->
+        raw.removePrefix("v").substringBefore('-')
+            .takeIf { it.matches(Regex("[0-9]+(\\.[0-9]+){0,2}")) }
+            ?: "1.0.0"
+    }
+    .orElse("1.0.0")
+
 dependencies {
     implementation(projects.shared)
     implementation(libs.tresse.kmp)
@@ -24,7 +33,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "com.akergez.shardkeep"
-            packageVersion = "1.0.0"
+            packageVersion = applicationVersion.get()
             linux {
                 iconFile.set(project.file("icons/icon.png"))
             }

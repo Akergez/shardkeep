@@ -7,6 +7,15 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+val applicationVersionName = providers.environmentVariable("APP_VERSION")
+    .orElse(providers.environmentVariable("CI_COMMIT_TAG"))
+    .orElse(providers.environmentVariable("CI_COMMIT_SHORT_SHA"))
+    .orElse("1.0.0")
+
+val applicationVersionCode = providers.environmentVariable("CI_PIPELINE_IID")
+    .map { it.toIntOrNull()?.coerceIn(1, 2_100_000_000) ?: 1 }
+    .orElse(1)
+
 apply(plugin = "org.jetbrains.kotlin.android")
 
 tasks.withType<KotlinCompile>().configureEach {
@@ -50,8 +59,8 @@ android {
         applicationId = "com.akergez.shardkeep"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = applicationVersionCode.get()
+        versionName = applicationVersionName.get()
     }
     packaging {
         resources {

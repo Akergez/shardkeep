@@ -106,7 +106,7 @@ build:macos-arm64:
       ditto "$APP_BUNDLE" "$STAGING/$(basename "$APP_BUNDLE")"
       ln -s /Applications "$STAGING/Applications"
       mkdir -p desktopApp/build/compose/binaries/main/dmg
-      hdiutil create -volname "Shardkeep" -srcfolder "$STAGING" -ov -format UDZO desktopApp/build/compose/binaries/main/dmg/Shardkeep-1.0.0.dmg
+      hdiutil create -volname "Shardkeep" -srcfolder "$STAGING" -ov -format UDZO "desktopApp/build/compose/binaries/main/dmg/Shardkeep-${CI_COMMIT_TAG}.dmg"
   artifacts:
     paths:
       - desktopApp/build/compose/binaries/main/dmg/*.dmg
