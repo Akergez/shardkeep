@@ -7,12 +7,15 @@ import android.os.Build
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.akergez.shardkeep.WorkspaceRegistry
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 object NotificationScheduler {
     const val CHANNEL_ID = "shardkeep_tasks"
-    const val WORK_TAG = "shardkeep_daily_notifications"
+    private const val WORK_TAG = "shardkeep_daily_notifications"
+    const val KEY_WORKSPACE_ID = "workspace_id"
     private const val NOTIFY_HOUR = 9
 
     fun createChannel(context: Context) {
@@ -29,25 +32,26 @@ object NotificationScheduler {
         }
     }
 
-    fun scheduleNext(context: Context) {
-        val prefs = context.getSharedPreferences("notes_directory", Context.MODE_PRIVATE)
+    fun scheduleNext(context: Context, workspaceId: String) {
+        val prefs = WorkspaceRegistry(context).preferences(workspaceId)
         if (!prefs.getBoolean("notifications_enabled", true)) return
 
         val delayMs = millisUntilNextNotifyHour()
         val request = OneTimeWorkRequestBuilder<NotificationWorker>()
             .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
-            .addTag(WORK_TAG)
+            .setInputData(workDataOf(KEY_WORKSPACE_ID to workspaceId))
+            .addTag(workTag(workspaceId))
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
-            WORK_TAG,
+            workTag(workspaceId),
             ExistingWorkPolicy.KEEP,
             request,
         )
     }
 
-    fun cancel(context: Context) {
-        WorkManager.getInstance(context).cancelAllWorkByTag(WORK_TAG)
+    fun cancel(context: Context, workspaceId: String) {
+        WorkManager.getInstance(context).cancelAllWorkByTag(workTag(workspaceId))
     }
 
     private fun millisUntilNextNotifyHour(): Long {
@@ -61,4 +65,6 @@ object NotificationScheduler {
         }
         return target.timeInMillis - now.timeInMillis
     }
+
+    private fun workTag(id: String) = "$WORK_TAG-$id"
 }

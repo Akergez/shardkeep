@@ -63,6 +63,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         pendingDeepLink.value = parseDeepLink(intent)
         NotificationScheduler.createChannel(this)
+        WorkspaceRegistry(this).list().forEach { workspace ->
+            NotificationScheduler.scheduleNext(this, workspace.id)
+        }
         // These remote/credential fields live in config.toml. The [sync] fields
         // (sync_auto_enabled / sync_interval_minutes / sync_debounce_seconds) are
         // device-local and intentionally kept in SharedPreferences.
@@ -102,15 +105,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDeepLink?>) {
-    val preferences = remember { getSharedPreferences("notes_directory", Context.MODE_PRIVATE) }
-    var treeUri by remember {
-        mutableStateOf(preferences.getString("tree_uri", null)?.let(Uri::parse))
-    }
-    var taskFormat by remember {
-        mutableStateOf(preferences.getString("task_format", null)?.let {
-            runCatching { TaskFormat.valueOf(it) }.getOrNull()
-        })
-    }
+    val workspaceRegistry = remember { WorkspaceRegistry(applicationContext) }
+    var workspaceRecords by remember { mutableStateOf(workspaceRegistry.list()) }
+    var activeWorkspaceId by remember { mutableStateOf(workspaceRegistry.active()?.id) }
+    val activeWorkspace = workspaceRecords.firstOrNull { it.id == activeWorkspaceId }
+        ?: workspaceRecords.firstOrNull()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         runCatching {
@@ -119,32 +118,37 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
             )
         }
-        preferences.edit().putString("tree_uri", uri.toString()).apply()
-        treeUri = uri
+        val name = uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')
+            ?.takeIf { it.isNotBlank() } ?: "Workspace ${workspaceRecords.size + 1}"
+        val added = workspaceRegistry.add(name, uri)
+        workspaceRecords = workspaceRegistry.list()
+        activeWorkspaceId = added.id
     }
 
     val notifPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {}
-    LaunchedEffect(treeUri) {
-        if (treeUri == null) return@LaunchedEffect
+    LaunchedEffect(activeWorkspace?.id) {
+        if (activeWorkspace == null) return@LaunchedEffect
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        NotificationScheduler.scheduleNext(applicationContext)
+        NotificationScheduler.scheduleNext(applicationContext, activeWorkspace.id)
     }
 
-    val uri = treeUri
-    if (uri == null) {
+    if (activeWorkspace == null) {
         NotesDirectorySetupScreen(onChooseNotesDirectory = { picker.launch(null) })
         return
     }
+    val uri = activeWorkspace.treeUri
+    val preferences = remember(activeWorkspace.id) { workspaceRegistry.preferences(activeWorkspace.id) }
+    val syncStatus = remember(activeWorkspace.id) { SyncStatusHolder.storeFor(activeWorkspace.id) }
 
-    val format = taskFormat
+    val format = activeWorkspace.taskFormat
     if (format == null) {
         FormatSetupScreen(onFormatSelected = { chosen ->
-            preferences.edit().putString("task_format", chosen.name).apply()
-            taskFormat = chosen
+            workspaceRegistry.update(activeWorkspace.copy(taskFormat = chosen))
+            workspaceRecords = workspaceRegistry.list()
         })
         return
     }
@@ -175,8 +179,8 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
         val config = runCatching { TresseConfigFile.read(storage) }.getOrNull()
             ?.withLocalSync(preferences)
         syncConfig = config
-        pushSyncStatus(config)
-        TresseSyncScheduler.schedule(applicationContext, config)
+        pushSyncStatus(syncStatus, config)
+        TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, config)
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -206,8 +210,6 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
         NotesDirectoryErrorScreen(
             onRetry = { refreshKey += 1 },
             onChooseAnother = {
-                preferences.edit().remove("tree_uri").apply()
-                treeUri = null
                 picker.launch(null)
             },
         )
@@ -218,6 +220,13 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
             quickNoteRepository = quickNoteRepository,
             deepLink = pendingDeepLink.value,
             onDeepLinkHandled = { pendingDeepLink.value = null },
+            workspaceName = activeWorkspace.name,
+            workspaces = workspaceRecords.map { WorkspaceOption(it.id, it.name) },
+            onWorkspaceSelected = { id ->
+                workspaceRegistry.select(id)
+                activeWorkspaceId = id
+            },
+            onAddWorkspace = { picker.launch(null) },
             settingsCallbacks = SettingsCallbacks(
                 quickNotesFolder = quickNotesFolder,
                 onFolderChange = { newFolder ->
@@ -228,8 +237,8 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 onNotificationsEnabledChange = { enabled ->
                     preferences.edit().putBoolean("notifications_enabled", enabled).apply()
                     notificationsEnabled = enabled
-                    if (enabled) NotificationScheduler.scheduleNext(applicationContext)
-                    else NotificationScheduler.cancel(applicationContext)
+                    if (enabled) NotificationScheduler.scheduleNext(applicationContext, activeWorkspace.id)
+                    else NotificationScheduler.cancel(applicationContext, activeWorkspace.id)
                 },
                 syncConfig = syncConfig?.toDraft(),
                 onSyncConfigChange = { draft ->
@@ -237,8 +246,8 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     preferences.saveLocalSync(updated)
                     TresseConfigFile.write(storage, updated)
                     syncConfig = updated
-                    pushSyncStatus(updated)
-                    TresseSyncScheduler.schedule(applicationContext, updated)
+                    pushSyncStatus(syncStatus, updated)
+                    TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, updated)
                 },
                 onImportSyncConfig = { configString ->
                     runCatching { TresseConfigString.decode(configString) }.fold(
@@ -246,54 +255,54 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                             preferences.saveLocalSync(imported)
                             TresseConfigFile.write(storage, imported)
                             syncConfig = imported
-                            pushSyncStatus(imported)
-                            TresseSyncScheduler.schedule(applicationContext, imported)
+                            pushSyncStatus(syncStatus, imported)
+                            TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, imported)
                             true
                         },
                         onFailure = { false },
                     )
                 },
                 onSync = {
-                    SyncStatusHolder.store.begin(getString(R.string.sync_trigger_manual))
+                    syncStatus.begin(getString(R.string.sync_trigger_manual))
                     try {
                         val config = requireNotNull(TresseConfigFile.read(storage)) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
                         val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
-                        val result = TresseSync(vault).perform(config, SyncStatusHolder.store.asProgress())
+                        val result = TresseSync(vault).perform(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
                         val summary = summaryOf(result)
-                        SyncStatusHolder.store.finishOk(summary, SyncStatusHolder.nowLabel())
+                        syncStatus.finishOk(summary, SyncStatusHolder.nowLabel())
                         summary
                     } catch (error: Throwable) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
-                        SyncStatusHolder.store.finishError(
+                        syncStatus.finishError(
                             error.message?.takeIf { it.isNotBlank() } ?: getString(R.string.sync_error_generic),
                         )
                         throw error
                     }
                 },
                 onForcePull = {
-                    SyncStatusHolder.store.begin(getString(R.string.sync_trigger_manual))
+                    syncStatus.begin(getString(R.string.sync_trigger_manual))
                     try {
                         val config = requireNotNull(TresseConfigFile.read(storage)) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
                         val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
-                        val result = TresseSync(vault).forcePull(config, SyncStatusHolder.store.asProgress())
+                        val result = TresseSync(vault).forcePull(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
                         val summary = summaryOf(result)
-                        SyncStatusHolder.store.finishOk(summary, SyncStatusHolder.nowLabel())
+                        syncStatus.finishOk(summary, SyncStatusHolder.nowLabel())
                         summary
                     } catch (error: Throwable) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
-                        SyncStatusHolder.store.finishError(
+                        syncStatus.finishError(
                             error.message?.takeIf { it.isNotBlank() } ?: getString(R.string.sync_error_generic),
                         )
                         throw error
                     }
                 },
-                syncState = SyncStatusHolder.store.state,
+                syncState = syncStatus.state,
             ),
         )
     }
@@ -301,8 +310,8 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
 
 
 /** Reflect the currently saved config in the sync status panel's storage line. */
-private fun pushSyncStatus(config: TresseConfig?) {
-    SyncStatusHolder.store.updateConfig(
+private fun pushSyncStatus(store: SyncStatusStore, config: TresseConfig?) {
+    store.updateConfig(
         storageType = config?.storageType ?: "http",
         configured = config?.isComplete() == true,
         autoSyncEnabled = config?.autoSyncEnabled == true,

@@ -9,8 +9,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.akergez.shardkeep.MainActivity
 import com.akergez.shardkeep.R
-import com.akergez.shardkeep.db.DatabaseDriverFactory
-import com.akergez.shardkeep.db.createDatabase
+import com.akergez.shardkeep.WorkspaceRegistry
+import com.akergez.shardkeep.data.NotesDirectoryTaskRepository
+import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
+import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -21,22 +23,23 @@ class NotificationWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val prefs = applicationContext.getSharedPreferences("notes_directory", Context.MODE_PRIVATE)
+        val workspaceId = inputData.getString(NotificationScheduler.KEY_WORKSPACE_ID) ?: return Result.success()
+        val registry = WorkspaceRegistry(applicationContext)
+        val workspace = registry.list().firstOrNull { it.id == workspaceId } ?: return Result.success()
+        val prefs = registry.preferences(workspaceId)
         if (!prefs.getBoolean("notifications_enabled", true)) {
-            NotificationScheduler.scheduleNext(applicationContext)
             return Result.success()
         }
-        if (prefs.getString("tree_uri", null) == null) {
-            NotificationScheduler.scheduleNext(applicationContext)
-            return Result.success()
-        }
-
-        val db = runCatching { createDatabase(DatabaseDriverFactory(applicationContext)) }
-            .getOrNull() ?: return Result.retry()
+        val format = workspace.taskFormat ?: return Result.success()
+        val repository = NotesDirectoryTaskRepository(
+            AndroidSafNotesDirectoryStorage(applicationContext, workspace.treeUri),
+            format,
+        )
+        runCatching { repository.refresh() }.getOrElse { return Result.retry() }
 
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
-        val dueTasks = db.indexedTaskQueries.selectAll().executeAsList().filter { row ->
-            row.due_date == today && row.status != "Done"
+        val dueTasks = repository.observeTasks().first().filter { task ->
+            task.dueDate?.toString() == today && task.status.name != "Done"
         }
 
         if (dueTasks.isNotEmpty()) {
@@ -64,11 +67,11 @@ class NotificationWorker(
                     .setContentIntent(openIntent)
                     .build()
 
-                manager.notify(task.id.hashCode(), notification)
+                manager.notify("$workspaceId:${task.id.value}".hashCode(), notification)
             }
         }
 
-        NotificationScheduler.scheduleNext(applicationContext)
+        NotificationScheduler.scheduleNext(applicationContext, workspaceId)
         return Result.success()
     }
 }

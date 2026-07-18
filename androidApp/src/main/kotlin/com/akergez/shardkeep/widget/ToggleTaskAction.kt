@@ -13,28 +13,28 @@ import com.akergez.shardkeep.domain.model.TaskFormat
 import com.akergez.shardkeep.domain.model.TaskId
 import com.akergez.shardkeep.domain.model.TaskStatus
 import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
+import com.akergez.shardkeep.WorkspaceRegistry
 
 class ToggleTaskAction : ActionCallback {
     companion object {
         val TASK_ID_KEY = ActionParameters.Key<String>("task_id")
         val NEW_STATUS_KEY = ActionParameters.Key<String>("new_status")
+        val WORKSPACE_ID_KEY = ActionParameters.Key<String>("workspace_id")
     }
 
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val taskId = parameters[TASK_ID_KEY] ?: return
+        val workspaceId = parameters[WORKSPACE_ID_KEY] ?: return
         val newStatus = when (parameters[NEW_STATUS_KEY]) {
             "Done" -> TaskStatus.Done
             else -> TaskStatus.Todo
         }
 
-        val prefs = context.getSharedPreferences("notes_directory", Context.MODE_PRIVATE)
-        val uriStr = prefs.getString("tree_uri", null) ?: return
-        val formatStr = prefs.getString("task_format", null) ?: return
-        val format = runCatching { TaskFormat.valueOf(formatStr) }.getOrNull() ?: return
+        val workspace = WorkspaceRegistry(context).list().firstOrNull { it.id == workspaceId } ?: return
+        val format = workspace.taskFormat ?: return
 
-        val storage = AndroidSafNotesDirectoryStorage(context, Uri.parse(uriStr))
-        val database = createDatabase(DatabaseDriverFactory(context))
-        val repository = NotesDirectoryTaskRepository(storage, format, database = database)
+        val storage = AndroidSafNotesDirectoryStorage(context, workspace.treeUri)
+        val repository = NotesDirectoryTaskRepository(storage, format)
 
         runCatching {
             repository.refresh()

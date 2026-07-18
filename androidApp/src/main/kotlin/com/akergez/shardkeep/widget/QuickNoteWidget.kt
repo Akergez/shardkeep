@@ -29,13 +29,23 @@ import androidx.glance.text.TextStyle
 import com.akergez.shardkeep.R
 import com.akergez.shardkeep.domain.model.QuickNote
 
-data class WidgetNote(val path: String, val title: String, val content: String)
+data class WidgetNote(
+    val workspaceId: String,
+    val workspaceName: String,
+    val path: String,
+    val title: String,
+    val content: String,
+) {
+    val selectionKey: String get() = "$workspaceId::$path"
+}
 
 class QuickNoteWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val initialNotes = WidgetUpdater.loadNotes(context)
-            .filterIsInstance<QuickNote.Text>()
-            .map { WidgetNote(it.id.path, it.title, it.content) }
+        val initialNotes = WidgetUpdater.loadNotes(context).flatMap { source ->
+            source.notes.filterIsInstance<QuickNote.Text>().map {
+                WidgetNote(source.workspaceId, source.workspaceName, it.id.path, it.title, it.content)
+            }
+        }
         provideContent {
             GlanceTheme {
                 val state = currentState<Preferences>()
@@ -43,7 +53,7 @@ class QuickNoteWidget : GlanceAppWidget() {
                     ?.let(WidgetNoteState::decodeNotes)
                     ?: initialNotes
                 val expanded = state[DROPDOWN_EXPANDED] ?: false
-                val selected = notes.firstOrNull { it.path == state[SELECTED_PATH] }
+                val selected = notes.firstOrNull { it.selectionKey == state[SELECTED_PATH] }
                     ?: notes.firstOrNull()
                 QuickNoteContent(notes, selected, expanded)
             }
@@ -81,11 +91,11 @@ private fun QuickNoteContent(notes: List<WidgetNote>, selected: WidgetNote?, exp
 
         if (expanded) {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                items(notes, itemId = { it.path.hashCode().toLong() }) { note ->
+                items(notes, itemId = { it.selectionKey.hashCode().toLong() }) { note ->
                     PickerRow(
-                        title = note.title,
-                        isSelected = note.path == selected?.path,
-                        action = actionRunCallback<SelectNoteAction>(selectParams(note.path)),
+                        title = "${note.workspaceName} — ${note.title}",
+                        isSelected = note.selectionKey == selected?.selectionKey,
+                        action = actionRunCallback<SelectNoteAction>(selectParams(note.selectionKey)),
                     )
                 }
             }

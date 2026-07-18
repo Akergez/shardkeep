@@ -42,7 +42,15 @@ import com.akergez.shardkeep.R
 import com.akergez.shardkeep.domain.model.QuickNote
 
 data class WidgetChecklistItem(val index: Int, val text: String, val isChecked: Boolean)
-data class WidgetChecklist(val path: String, val title: String, val items: List<WidgetChecklistItem>)
+data class WidgetChecklist(
+    val workspaceId: String,
+    val workspaceName: String,
+    val path: String,
+    val title: String,
+    val items: List<WidgetChecklistItem>,
+) {
+    val selectionKey: String get() = "$workspaceId::$path"
+}
 
 class ChecklistWidget : GlanceAppWidget() {
 
@@ -54,10 +62,11 @@ class ChecklistWidget : GlanceAppWidget() {
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val initialChecklists = WidgetUpdater.loadNotes(context)
-            .filterIsInstance<QuickNote.Checklist>()
-            .map { checklist ->
+        val initialChecklists = WidgetUpdater.loadNotes(context).flatMap { source ->
+            source.notes.filterIsInstance<QuickNote.Checklist>().map { checklist ->
                 WidgetChecklist(
+                    workspaceId = source.workspaceId,
+                    workspaceName = source.workspaceName,
                     path = checklist.id.path,
                     title = checklist.title,
                     items = checklist.items.map { item ->
@@ -65,6 +74,7 @@ class ChecklistWidget : GlanceAppWidget() {
                     },
                 )
             }
+        }
         Log.i("ShardkeepWidget", "Loaded initial checklist widget state with ${initialChecklists.size} checklists")
         provideContent {
             GlanceTheme {
@@ -74,7 +84,7 @@ class ChecklistWidget : GlanceAppWidget() {
                     ?: initialChecklists
                 Log.i("ShardkeepWidget", "Rendering checklist widget with ${checklists.size} checklists")
                 val expanded = state[DROPDOWN_EXPANDED] ?: false
-                val selected = checklists.firstOrNull { it.path == state[SELECTED_PATH] }
+                val selected = checklists.firstOrNull { it.selectionKey == state[SELECTED_PATH] }
                     ?: checklists.firstOrNull()
                 val isLarge = LocalSize.current.width >= 200.dp
                 ChecklistContent(checklists, selected, expanded, isLarge)
@@ -123,18 +133,18 @@ private fun ChecklistContent(
 
         if (expanded) {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                items(checklists, itemId = { it.path.hashCode().toLong() }) { checklist ->
+                items(checklists, itemId = { it.selectionKey.hashCode().toLong() }) { checklist ->
                     PickerRow(
-                        title = checklist.title,
-                        isSelected = checklist.path == selected?.path,
-                        action = actionRunCallback<SelectChecklistAction>(selectParams(checklist.path)),
+                        title = "${checklist.workspaceName} — ${checklist.title}",
+                        isSelected = checklist.selectionKey == selected?.selectionKey,
+                        action = actionRunCallback<SelectChecklistAction>(selectParams(checklist.selectionKey)),
                     )
                 }
             }
         } else if (isLarge) {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 items(selected?.items ?: emptyList(), itemId = { it.index.toLong() }) { item ->
-                    ChecklistRow(selected!!.path, item)
+                    ChecklistRow(selected!!.workspaceId, selected.path, item)
                 }
             }
         } else {
@@ -151,7 +161,7 @@ private fun ChecklistContent(
 }
 
 @Composable
-private fun ChecklistRow(path: String, item: WidgetChecklistItem) {
+private fun ChecklistRow(workspaceId: String, path: String, item: WidgetChecklistItem) {
     val context = LocalContext.current
     Row(
         modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -164,6 +174,7 @@ private fun ChecklistRow(path: String, item: WidgetChecklistItem) {
                     actionRunCallback<ToggleChecklistItemAction>(
                         androidx.glance.action.actionParametersOf(
                             ToggleChecklistItemAction.NOTE_PATH_KEY to path,
+                            ToggleChecklistItemAction.WORKSPACE_ID_KEY to workspaceId,
                             ToggleChecklistItemAction.ITEM_INDEX_KEY to item.index,
                             ToggleChecklistItemAction.IS_CHECKED_KEY to !item.isChecked,
                         )

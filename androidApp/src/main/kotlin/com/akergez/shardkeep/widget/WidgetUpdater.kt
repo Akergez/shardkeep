@@ -14,30 +14,34 @@ import com.akergez.shardkeep.domain.model.QuickNote
 import com.akergez.shardkeep.domain.model.TaskFormat
 import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
 import kotlinx.coroutines.flow.first
+import com.akergez.shardkeep.WorkspaceRegistry
+
+data class WorkspaceNotes(val workspaceId: String, val workspaceName: String, val notes: List<QuickNote>)
 
 /** Rebuilds widget data after changes made while the application UI is not running. */
 object WidgetUpdater {
-    suspend fun loadNotes(context: Context): List<QuickNote> {
+    suspend fun loadNotes(context: Context): List<WorkspaceNotes> {
         val appContext = context.applicationContext
-        val prefs = appContext.getSharedPreferences("notes_directory", Context.MODE_PRIVATE)
-        val treeUri = prefs.getString("tree_uri", null)?.let(Uri::parse) ?: return emptyList()
-        val quickNotesFolder = prefs.getString("quick_notes_folder", null)
-            ?: NotesDirectoryQuickNoteRepository.QUICK_NOTES_FOLDER
-        val repository = NotesDirectoryQuickNoteRepository(
-            AndroidSafNotesDirectoryStorage(appContext, treeUri),
-            quickNotesFolder,
-        )
-        return try {
-            repository.refresh()
-            repository.observeNotes().first().also { notes ->
+        val registry = WorkspaceRegistry(appContext)
+        return registry.list().mapNotNull { workspace ->
+            val quickNotesFolder = registry.preferences(workspace.id).getString("quick_notes_folder", null)
+                ?: NotesDirectoryQuickNoteRepository.QUICK_NOTES_FOLDER
+            val repository = NotesDirectoryQuickNoteRepository(
+                AndroidSafNotesDirectoryStorage(appContext, workspace.treeUri),
+                quickNotesFolder,
+            )
+            try {
+                repository.refresh()
+                val notes = repository.observeNotes().first()
                 Log.i(
                     "ShardkeepWidget",
-                    "Loaded ${notes.size} notes from SAF (${notes.count { it is QuickNote.Checklist }} checklists)",
+                    "Loaded ${notes.size} notes for ${workspace.name}",
                 )
+                WorkspaceNotes(workspace.id, workspace.name, notes)
+            } catch (error: Throwable) {
+                Log.e("ShardkeepWidget", "Failed to load notes for ${workspace.name}", error)
+                null
             }
-        } catch (error: Throwable) {
-            Log.e("ShardkeepWidget", "Failed to load widget notes from SAF", error)
-            throw error
         }
     }
 
@@ -69,21 +73,14 @@ object WidgetUpdater {
 
     suspend fun refreshAll(context: Context) {
         val appContext = context.applicationContext
-        val prefs = appContext.getSharedPreferences("notes_directory", Context.MODE_PRIVATE)
-        val treeUri = prefs.getString("tree_uri", null)?.let(Uri::parse) ?: return
-        val taskFormat = prefs.getString("task_format", null)
-            ?.let { runCatching { TaskFormat.valueOf(it) }.getOrNull() }
-            ?: return
-        val quickNotesFolder = prefs.getString("quick_notes_folder", null)
-            ?: NotesDirectoryQuickNoteRepository.QUICK_NOTES_FOLDER
-        val storage = AndroidSafNotesDirectoryStorage(appContext, treeUri)
-
-        val taskRepository = NotesDirectoryTaskRepository(
-            storage = storage,
-            format = taskFormat,
-            database = createDatabase(DatabaseDriverFactory(appContext)),
-        )
-        taskRepository.refresh()
+        val registry = WorkspaceRegistry(appContext)
+        registry.list().forEach { workspace ->
+            val format = workspace.taskFormat ?: return@forEach
+            NotesDirectoryTaskRepository(
+                storage = AndroidSafNotesDirectoryStorage(appContext, workspace.treeUri),
+                format = format,
+            ).refresh()
+        }
         publishTasks(appContext)
         publishNotes(appContext)
     }

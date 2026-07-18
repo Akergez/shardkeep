@@ -13,9 +13,13 @@ private const val KEY_SYNC_DEBOUNCE = "sync_debounce_seconds"
 
 internal fun TresseConfig.withLocalSync(prefs: SharedPreferences): TresseConfig = copy(
     autoSyncEnabled = prefs.getBoolean(KEY_SYNC_ENABLED, false),
-    autoSyncIntervalMinutes = prefs.getLong(KEY_SYNC_INTERVAL, autoSyncIntervalMinutes),
-    autoSyncDebounceSeconds = prefs.getLong(KEY_SYNC_DEBOUNCE, autoSyncDebounceSeconds),
+    autoSyncIntervalMinutes = prefs.numberAsLong(KEY_SYNC_INTERVAL, autoSyncIntervalMinutes),
+    autoSyncDebounceSeconds = prefs.numberAsLong(KEY_SYNC_DEBOUNCE, autoSyncDebounceSeconds),
 )
+
+/** Accepts both the old Int migration value and the canonical Long representation. */
+private fun SharedPreferences.numberAsLong(key: String, default: Long): Long =
+    (all[key] as? Number)?.toLong() ?: default
 
 internal fun SharedPreferences.saveLocalSync(config: TresseConfig) {
     edit()

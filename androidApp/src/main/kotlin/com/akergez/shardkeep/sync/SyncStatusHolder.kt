@@ -12,7 +12,9 @@ import java.util.Locale
  * sees after tapping "Sync now".
  */
 object SyncStatusHolder {
-    val store = SyncStatusStore()
+    private val stores = mutableMapOf<String, SyncStatusStore>()
+    @Synchronized fun storeFor(workspaceId: String): SyncStatusStore =
+        stores.getOrPut(workspaceId) { SyncStatusStore() }
 
     /** Local wall-clock label for a just-finished sync, e.g. "14:30". */
     fun nowLabel(): String = SimpleDateFormat("HH:mm", Locale.ROOT).format(Date())

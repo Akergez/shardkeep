@@ -287,6 +287,8 @@ data class SettingsCallbacks(
     val syncState: StateFlow<SyncState>? = null,
 )
 
+data class WorkspaceOption(val id: String, val name: String)
+
 private enum class AppSection { Tasks, AllTasks, Notes, Settings }
 
 @Composable
@@ -369,6 +371,10 @@ fun ShardkeepApp(
     settingsCallbacks: SettingsCallbacks? = null,
     deepLink: AppDeepLink? = null,
     onDeepLinkHandled: () -> Unit = {},
+    workspaceName: String = "Shardkeep",
+    workspaces: List<WorkspaceOption> = emptyList(),
+    onWorkspaceSelected: (String) -> Unit = {},
+    onAddWorkspace: () -> Unit = {},
 ) {
     var filter by remember { mutableStateOf(TaskFilter()) }
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
@@ -393,6 +399,7 @@ fun ShardkeepApp(
     var focusedAllTasksPath by remember { mutableStateOf<String?>(null) }
     var createTaskPathOverride by remember { mutableStateOf<String?>(null) }
     var editingTask by remember { mutableStateOf<Task?>(null) }
+    var workspaceMenuExpanded by remember { mutableStateOf(false) }
     val refreshCompleteMessage = stringResource(Res.string.refresh_complete)
     val refreshErrorMessage = stringResource(Res.string.refresh_error)
     val taskSaveErrorMessage = stringResource(Res.string.task_save_error)
@@ -467,7 +474,42 @@ fun ShardkeepApp(
                 modifier = Modifier.weight(1f),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(Res.string.app_name)) },
+                title = {
+                    Box {
+                        TextButton(onClick = { workspaceMenuExpanded = true }) {
+                            Text(
+                                text = workspaceName,
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            Text(
+                                text = "  ▾",
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = workspaceMenuExpanded,
+                            onDismissRequest = { workspaceMenuExpanded = false },
+                        ) {
+                            workspaces.forEach { workspace ->
+                                DropdownMenuItem(
+                                    text = { Text(workspace.name) },
+                                    onClick = {
+                                        workspaceMenuExpanded = false
+                                        onWorkspaceSelected(workspace.id)
+                                    },
+                                )
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("+ Add workspace") },
+                                onClick = {
+                                    workspaceMenuExpanded = false
+                                    onAddWorkspace()
+                                },
+                            )
+                        }
+                    }
+                },
                 actions = {
                     TextButton(
                         enabled = !refreshing,

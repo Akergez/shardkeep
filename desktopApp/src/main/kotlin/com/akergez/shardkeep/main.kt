@@ -25,6 +25,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.prefs.Preferences
 import javax.swing.JFileChooser
+import java.util.UUID
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
@@ -42,44 +43,45 @@ fun main() {
 @Composable
 private fun DesktopShardkeepApp() {
     DesktopMacOsTheme {
-        val preferences = remember { Preferences.userNodeForPackage(DesktopNotesDirectoryStorage::class.java) }
-        var rootPath by remember { mutableStateOf(preferences.get("notesDirectory", null)) }
-        var format by remember {
-            mutableStateOf(preferences.get("taskFormat", null)?.let { runCatching { TaskFormat.valueOf(it) }.getOrNull() })
+        val registryPreferences = remember { Preferences.userNodeForPackage(DesktopNotesDirectoryStorage::class.java) }
+        var workspaces by remember { mutableStateOf(loadDesktopWorkspaces(registryPreferences)) }
+        var activeWorkspaceId by remember {
+            mutableStateOf(registryPreferences.get("activeWorkspaceId", null) ?: workspaces.firstOrNull()?.id)
         }
+        val activeWorkspace = workspaces.firstOrNull { it.id == activeWorkspaceId } ?: workspaces.firstOrNull()
+        val rootPath = activeWorkspace?.path
+        val format = activeWorkspace?.format
         val root = rootPath?.let(::File)
         if (root == null || !root.isDirectory) {
             NotesDirectorySetupScreen(onChooseNotesDirectory = {
-                JFileChooser().apply {
-                    fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-                    dialogTitle = "Select notes directory"
-                }.let { chooser ->
-                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                        chooser.selectedFile.absolutePath.also {
-                            preferences.put("notesDirectory", it)
-                            rootPath = it
-                        }
-                    }
+                chooseDirectory()?.let { directory ->
+                    val added = DesktopWorkspace(UUID.randomUUID().toString(), directory.name, directory.absolutePath, null)
+                    workspaces = workspaces + added
+                    saveDesktopWorkspaces(registryPreferences, workspaces, added.id)
+                    activeWorkspaceId = added.id
                 }
             })
             return@DesktopMacOsTheme
         }
         if (format == null) {
-            FormatSetupScreen(onFormatSelected = {
-                preferences.put("taskFormat", it.name)
-                format = it
+            FormatSetupScreen(onFormatSelected = { selectedFormat ->
+                workspaces = workspaces.map {
+                    if (it.id == activeWorkspace!!.id) it.copy(format = selectedFormat) else it
+                }
+                saveDesktopWorkspaces(registryPreferences, workspaces, activeWorkspace!!.id)
             })
             return@DesktopMacOsTheme
         }
 
+        val preferences = remember(activeWorkspace!!.id) { registryPreferences.node("workspace_${activeWorkspace.id}") }
         val storage = remember(rootPath) { DesktopNotesDirectoryStorage(root) }
         val taskRepository = remember(storage, format) { NotesDirectoryTaskRepository(storage, checkNotNull(format)) }
         var quickNotesFolder by remember { mutableStateOf(preferences.get("quickNotesFolder", NotesDirectoryQuickNoteRepository.QUICK_NOTES_FOLDER)) }
         val quickNoteRepository = remember(storage, quickNotesFolder) {
             NotesDirectoryQuickNoteRepository(storage, quickNotesFolder)
         }
-        val syncStore = remember { SyncStatusStore() }
-        val syncMutex = remember { Mutex() }
+        val syncStore = remember(activeWorkspace.id) { SyncStatusStore() }
+        val syncMutex = remember(activeWorkspace.id) { Mutex() }
         var syncConfig by remember(storage) { mutableStateOf<TresseConfig?>(null) }
 
         fun syncEngine(config: TresseConfig) = TresseSync(fileTresseVault(root) { ignoredPath(it, config) })
@@ -114,12 +116,27 @@ private fun DesktopShardkeepApp() {
             syncConfig?.let { syncStore.updateConfig(it.storageType, it.isComplete(), it.autoSyncEnabled) }
         }
 
-        LaunchedEffect(syncConfig) {
-            val config = syncConfig ?: return@LaunchedEffect
-            if (!config.autoSyncEnabled || !config.isComplete()) return@LaunchedEffect
+        LaunchedEffect(workspaces) {
+            val lastRuns = mutableMapOf<String, Long>()
             while (true) {
-                delay(config.autoSyncIntervalMinutes.coerceAtLeast(1) * 60_000)
-                runCatching { perform(false) }
+                delay(60_000)
+                val now = System.currentTimeMillis()
+                workspaces.forEach { workspace ->
+                    val directory = File(workspace.path)
+                    if (!directory.isDirectory) return@forEach
+                    val workspacePreferences = registryPreferences.node("workspace_${workspace.id}")
+                    val engine = TresseSync(fileTresseVault(directory))
+                    val config = engine.loadConfig()?.withLocalSync(workspacePreferences) ?: return@forEach
+                    if (!config.autoSyncEnabled || !config.isComplete()) return@forEach
+                    val interval = config.autoSyncIntervalMinutes.coerceAtLeast(1) * 60_000
+                    if (now - (lastRuns[workspace.id] ?: 0L) < interval) return@forEach
+                    lastRuns[workspace.id] = now
+                    runCatching {
+                        TresseSync(fileTresseVault(directory) { ignoredPath(it, config) }).perform(config)
+                    }.onSuccess {
+                        if (workspace.id == activeWorkspace.id) refresh()
+                    }
+                }
             }
         }
 
@@ -127,6 +144,20 @@ private fun DesktopShardkeepApp() {
             repository = taskRepository,
             quickNoteRepository = quickNoteRepository,
             today = currentLocalDate(),
+            workspaceName = activeWorkspace.name,
+            workspaces = workspaces.map { WorkspaceOption(it.id, it.name) },
+            onWorkspaceSelected = { id ->
+                registryPreferences.put("activeWorkspaceId", id)
+                activeWorkspaceId = id
+            },
+            onAddWorkspace = {
+                chooseDirectory()?.let { directory ->
+                    val added = DesktopWorkspace(UUID.randomUUID().toString(), directory.name, directory.absolutePath, null)
+                    workspaces = workspaces + added
+                    saveDesktopWorkspaces(registryPreferences, workspaces, added.id)
+                    activeWorkspaceId = added.id
+                }
+            },
             settingsCallbacks = SettingsCallbacks(
                 quickNotesFolder = quickNotesFolder,
                 onFolderChange = {
@@ -198,4 +229,62 @@ private fun Preferences.saveLocalSync(config: TresseConfig) {
     putBoolean("syncAutoEnabled", config.autoSyncEnabled)
     putLong("syncIntervalMinutes", config.autoSyncIntervalMinutes)
     putLong("syncDebounceSeconds", config.autoSyncDebounceSeconds)
+}
+
+private data class DesktopWorkspace(
+    val id: String,
+    val name: String,
+    val path: String,
+    val format: TaskFormat?,
+)
+
+private fun loadDesktopWorkspaces(preferences: Preferences): List<DesktopWorkspace> {
+    var ids = preferences.get("workspaceIds", "").split(',').filter(String::isNotBlank)
+    if (ids.isEmpty()) {
+        val legacyPath = preferences.get("notesDirectory", null)
+        if (legacyPath != null) {
+            val id = UUID.randomUUID().toString()
+            val node = preferences.node("workspace_$id")
+            node.put("name", File(legacyPath).name.ifBlank { "Shardkeep" })
+            node.put("path", legacyPath)
+            preferences.get("taskFormat", null)?.let { node.put("format", it) }
+            preferences.get("quickNotesFolder", null)?.let { node.put("quickNotesFolder", it) }
+            ids = listOf(id)
+            preferences.put("workspaceIds", id)
+            preferences.put("activeWorkspaceId", id)
+        }
+    }
+    return ids.mapNotNull { id ->
+        val node = preferences.node("workspace_$id")
+        val path = node.get("path", null) ?: return@mapNotNull null
+        DesktopWorkspace(
+            id = id,
+            name = node.get("name", File(path).name.ifBlank { "Workspace" }),
+            path = path,
+            format = node.get("format", null)?.let { runCatching { TaskFormat.valueOf(it) }.getOrNull() },
+        )
+    }
+}
+
+private fun saveDesktopWorkspaces(
+    preferences: Preferences,
+    workspaces: List<DesktopWorkspace>,
+    activeId: String,
+) {
+    preferences.put("workspaceIds", workspaces.joinToString(",") { it.id })
+    preferences.put("activeWorkspaceId", activeId)
+    workspaces.forEach { workspace ->
+        preferences.node("workspace_${workspace.id}").apply {
+            put("name", workspace.name)
+            put("path", workspace.path)
+            workspace.format?.let { put("format", it.name) }
+        }
+    }
+}
+
+private fun chooseDirectory(): File? = JFileChooser().apply {
+    fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+    dialogTitle = "Select notes directory"
+}.let { chooser ->
+    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
