@@ -59,12 +59,12 @@ build:linux-x86_64:
   image: eclipse-temurin:21-jdk
   <<: [*gradle_cache, *tag_rules]
   before_script:
-    - apt-get update && apt-get install -y fakeroot
+    - apt-get update && apt-get install -y rpm
   script:
-    - ./gradlew --no-daemon :desktopApp:packageDeb
+    - ./gradlew --no-daemon :desktopApp:packageRpm
   artifacts:
     paths:
-      - desktopApp/build/compose/binaries/main/deb/*.deb
+      - desktopApp/build/compose/binaries/main/rpm/*.rpm
     expire_in: 1 week
 
 build:linux-arm64:
@@ -74,12 +74,12 @@ build:linux-arm64:
     - saas-linux-small-arm64
   <<: [*gradle_cache, *tag_rules]
   before_script:
-    - apt-get update && apt-get install -y fakeroot
+    - apt-get update && apt-get install -y rpm
   script:
-    - ./gradlew --no-daemon :desktopApp:packageDeb
+    - ./gradlew --no-daemon :desktopApp:packageRpm
   artifacts:
     paths:
-      - desktopApp/build/compose/binaries/main/deb/*.deb
+      - desktopApp/build/compose/binaries/main/rpm/*.rpm
     expire_in: 1 week
 
 build:macos-arm64:
@@ -131,13 +131,13 @@ package:publish:
       test -n "$APK"
       curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$APK" "${PACKAGE_URL}/Shardkeep-${CI_COMMIT_TAG}.apk"
     - |
-      for file in desktopApp/build/compose/binaries/main/deb/*.deb; do
+      for file in desktopApp/build/compose/binaries/main/rpm/*.rpm; do
         case "$(basename "$file")" in
-          *amd64*) arch="x86_64" ;;
+          *x86_64*) arch="x86_64" ;;
           *arm64*|*aarch64*) arch="arm64" ;;
-          *) echo "Unknown DEB architecture: $file"; exit 1 ;;
+          *) echo "Unknown RPM architecture: $file"; exit 1 ;;
         esac
-        curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$file" "${PACKAGE_URL}/Shardkeep-${CI_COMMIT_TAG}-linux-${arch}.deb"
+        curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$file" "${PACKAGE_URL}/Shardkeep-${CI_COMMIT_TAG}-linux-${arch}.rpm"
       done
     - |
       DMG=$(find desktopApp/build/compose/binaries/main/dmg -name '*.dmg' -type f -print -quit)
@@ -158,19 +158,19 @@ release:
     description: |
       ## Downloads
       - Android APK
-      - Linux DEB (x86_64)
-      - Linux DEB (arm64)
+      - Linux RPM (x86_64)
+      - Linux RPM (arm64)
       - macOS DMG (arm64)
     assets:
       links:
         - name: "Android APK"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}.apk"
           link_type: package
-        - name: "Linux DEB (x86_64)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}-linux-x86_64.deb"
+        - name: "Linux RPM (x86_64)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}-linux-x86_64.rpm"
           link_type: package
-        - name: "Linux DEB (arm64)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}-linux-arm64.deb"
+        - name: "Linux RPM (arm64)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}-linux-arm64.rpm"
           link_type: package
         - name: "macOS DMG (arm64)"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}-macOS-arm64.dmg"
