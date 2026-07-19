@@ -25,14 +25,16 @@ import kotlinx.coroutines.sync.withLock
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
+import java.awt.Taskbar
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.prefs.Preferences
 import javax.swing.JFileChooser
 import java.util.UUID
+import javax.imageio.ImageIO
 
 fun main() {
-    System.setProperty("apple.awt.application.appearance", "system")
+    configureMacOsApplication()
     application {
     Window(
         onCloseRequest = ::exitApplication,
@@ -41,6 +43,20 @@ fun main() {
     ) {
         DesktopShardkeepApp()
     }
+    }
+}
+
+private fun configureMacOsApplication() {
+    if (!System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) return
+    System.setProperty("apple.awt.application.appearance", "system")
+    System.setProperty("apple.awt.application.name", "Shardkeep")
+    runCatching {
+        if (!Taskbar.isTaskbarSupported() ||
+            !Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_IMAGE)
+        ) return@runCatching
+        val iconUrl = Thread.currentThread().contextClassLoader.getResource("icon.png")
+            ?: return@runCatching
+        Taskbar.getTaskbar().iconImage = ImageIO.read(iconUrl)
     }
 }
 

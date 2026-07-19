@@ -27,6 +27,12 @@ dependencies {
     implementation(libs.compose.uiToolingPreview)
 }
 
+sourceSets {
+    main {
+        resources.srcDir("icons")
+    }
+}
+
 compose.desktop {
     application {
         mainClass = "com.akergez.shardkeep.MainKt"
@@ -40,6 +46,10 @@ compose.desktop {
             }
             windows {
                 iconFile.set(project.file("icons/icon.ico"))
+            }
+            macOS {
+                iconFile.set(project.file("icons/icon.icns"))
+                bundleID = "com.akergez.shardkeep"
             }
         }
     }
