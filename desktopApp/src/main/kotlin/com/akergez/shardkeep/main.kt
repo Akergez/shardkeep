@@ -54,7 +54,7 @@ private fun configureMacOsApplication() {
         if (!Taskbar.isTaskbarSupported() ||
             !Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_IMAGE)
         ) return@runCatching
-        val iconUrl = Thread.currentThread().contextClassLoader.getResource("icon.png")
+        val iconUrl = Thread.currentThread().contextClassLoader.getResource("icon-macos.png")
             ?: return@runCatching
         Taskbar.getTaskbar().iconImage = ImageIO.read(iconUrl)
     }

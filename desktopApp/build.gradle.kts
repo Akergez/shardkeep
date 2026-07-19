@@ -38,8 +38,8 @@ compose.desktop {
         mainClass = "com.akergez.shardkeep.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.akergez.shardkeep"
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Rpm)
+            packageName = "Shardkeep"
             packageVersion = applicationVersion.get()
             linux {
                 iconFile.set(project.file("icons/icon.png"))
