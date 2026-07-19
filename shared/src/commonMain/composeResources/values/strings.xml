@@ -111,4 +111,17 @@
     <string name="syncing">Syncing…</string>
     <string name="sync_now">Sync now</string>
     <string name="force_pull">Force pull</string>
+    <string name="add_workspace">+ Add workspace</string>
+    <string name="storage_http">HTTP</string>
+    <string name="storage_s3">S3</string>
+    <string name="s3_endpoint_hint">https://storage.yandexcloud.net</string>
+    <string name="s3_region_hint">ru-central1</string>
+    <string name="import_config_hint">[remote]\nurl = \"https://…\"</string>
+    <string name="select_notes_directory">Select notes directory</string>
+    <string name="sync_not_configured_error">Sync is not configured</string>
+    <string name="sync_trigger_desktop">Desktop</string>
+    <string name="sync_error_generic">Sync error</string>
+    <string name="sync_already_up_to_date">Already up to date</string>
+    <string name="sync_result_summary">Pushed %1$d, pulled %2$d</string>
+    <string name="workspace_default">Workspace</string>
 </resources>

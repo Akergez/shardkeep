@@ -9,6 +9,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.akergez.shardkeep.WorkspaceRegistry
+import com.akergez.shardkeep.R
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -22,10 +23,10 @@ object NotificationScheduler {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Задачи Shardkeep",
+                context.getString(R.string.notification_channel_tasks),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = "Ежедневное напоминание о задачах на сегодня"
+                description = context.getString(R.string.notification_channel_tasks_description)
             }
             context.getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(channel)

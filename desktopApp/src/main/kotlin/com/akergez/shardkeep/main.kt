@@ -12,6 +12,8 @@ import com.akergez.shardkeep.data.NotesDirectoryQuickNoteRepository
 import com.akergez.shardkeep.data.NotesDirectoryTaskRepository
 import com.akergez.shardkeep.domain.model.TaskFormat
 import com.akergez.shardkeep.platform.currentLocalDate
+import shardkeep.shared.generated.resources.Res
+import shardkeep.shared.generated.resources.*
 import com.akergez.tresse.kmp.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
 import com.akergez.tresse.kmp.TresseSync
@@ -20,6 +22,8 @@ import com.akergez.tresse.kmp.fileTresseVault
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 import java.io.File
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -32,7 +36,7 @@ fun main() {
     application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "Shardkeep",
+        title = stringResource(Res.string.app_name),
         icon = shardkeepAppIconPainter(),
     ) {
         DesktopShardkeepApp()
@@ -43,8 +47,15 @@ fun main() {
 @Composable
 private fun DesktopShardkeepApp() {
     DesktopMacOsTheme {
+        val defaultWorkspaceName = stringResource(Res.string.workspace_default)
+        val selectDirectoryTitle = stringResource(Res.string.select_notes_directory)
+        val syncNotConfiguredError = stringResource(Res.string.sync_not_configured_error)
+        val syncTriggerDesktop = stringResource(Res.string.sync_trigger_desktop)
+        val syncErrorGeneric = stringResource(Res.string.sync_error_generic)
         val registryPreferences = remember { Preferences.userNodeForPackage(DesktopNotesDirectoryStorage::class.java) }
-        var workspaces by remember { mutableStateOf(loadDesktopWorkspaces(registryPreferences)) }
+        var workspaces by remember(defaultWorkspaceName) {
+            mutableStateOf(loadDesktopWorkspaces(registryPreferences, defaultWorkspaceName))
+        }
         var activeWorkspaceId by remember {
             mutableStateOf(registryPreferences.get("activeWorkspaceId", null) ?: workspaces.firstOrNull()?.id)
         }
@@ -54,7 +65,7 @@ private fun DesktopShardkeepApp() {
         val root = rootPath?.let(::File)
         if (root == null || !root.isDirectory) {
             NotesDirectorySetupScreen(onChooseNotesDirectory = {
-                chooseDirectory()?.let { directory ->
+                chooseDirectory(selectDirectoryTitle)?.let { directory ->
                     val added = DesktopWorkspace(UUID.randomUUID().toString(), directory.name, directory.absolutePath, null)
                     workspaces = workspaces + added
                     saveDesktopWorkspaces(registryPreferences, workspaces, added.id)
@@ -90,18 +101,23 @@ private fun DesktopShardkeepApp() {
             quickNoteRepository.refresh()
         }
         suspend fun perform(forcePull: Boolean): String = syncMutex.withLock {
-            val config = checkNotNull(syncConfig) { "Sync is not configured" }
-            syncStore.begin("Desktop")
+            val config = checkNotNull(syncConfig) { syncNotConfiguredError }
+            syncStore.begin(syncTriggerDesktop)
             return try {
                 val engine = syncEngine(config)
                 val result = if (forcePull) engine.forcePull(config, syncStore.progress())
                 else engine.perform(config, syncStore.progress())
                 refresh()
-                summaryOf(result.pushed, result.pulled).also {
+                val summary = if (result.pushed == 0 && result.pulled == 0) {
+                    getString(Res.string.sync_already_up_to_date)
+                } else {
+                    getString(Res.string.sync_result_summary, result.pushed, result.pulled)
+                }
+                summary.also {
                     syncStore.finishOk(it, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")))
                 }
             } catch (error: Throwable) {
-                syncStore.finishError(error.message ?: "Sync error")
+                syncStore.finishError(error.message ?: syncErrorGeneric)
                 throw error
             }
         }
@@ -151,7 +167,7 @@ private fun DesktopShardkeepApp() {
                 activeWorkspaceId = id
             },
             onAddWorkspace = {
-                chooseDirectory()?.let { directory ->
+                chooseDirectory(selectDirectoryTitle)?.let { directory ->
                     val added = DesktopWorkspace(UUID.randomUUID().toString(), directory.name, directory.absolutePath, null)
                     workspaces = workspaces + added
                     saveDesktopWorkspaces(registryPreferences, workspaces, added.id)
@@ -197,9 +213,6 @@ private fun ignoredPath(path: String, config: TresseConfig): Boolean =
     path == ".tresse" || path.startsWith(".tresse/") ||
         config.ignorePatterns.any { it.isNotBlank() && (path == it || path.startsWith("$it/")) }
 
-private fun summaryOf(pushed: Int, pulled: Int): String =
-    if (pushed == 0 && pulled == 0) "Already up to date" else "Pushed $pushed, pulled $pulled"
-
 private fun SyncStatusStore.progress() = object : TresseSyncProgress {
     override fun reportCommitRead() = this@progress.reportCommitRead()
     override fun reportUpload() = this@progress.reportUpload()
@@ -238,7 +251,10 @@ private data class DesktopWorkspace(
     val format: TaskFormat?,
 )
 
-private fun loadDesktopWorkspaces(preferences: Preferences): List<DesktopWorkspace> {
+private fun loadDesktopWorkspaces(
+    preferences: Preferences,
+    defaultWorkspaceName: String,
+): List<DesktopWorkspace> {
     var ids = preferences.get("workspaceIds", "").split(',').filter(String::isNotBlank)
     if (ids.isEmpty()) {
         val legacyPath = preferences.get("notesDirectory", null)
@@ -259,7 +275,7 @@ private fun loadDesktopWorkspaces(preferences: Preferences): List<DesktopWorkspa
         val path = node.get("path", null) ?: return@mapNotNull null
         DesktopWorkspace(
             id = id,
-            name = node.get("name", File(path).name.ifBlank { "Workspace" }),
+            name = node.get("name", File(path).name.ifBlank { defaultWorkspaceName }),
             path = path,
             format = node.get("format", null)?.let { runCatching { TaskFormat.valueOf(it) }.getOrNull() },
         )
@@ -282,9 +298,9 @@ private fun saveDesktopWorkspaces(
     }
 }
 
-private fun chooseDirectory(): File? = JFileChooser().apply {
+private fun chooseDirectory(title: String): File? = JFileChooser().apply {
     fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-    dialogTitle = "Select notes directory"
+    dialogTitle = title
 }.let { chooser ->
     if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }

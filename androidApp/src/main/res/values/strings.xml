@@ -16,4 +16,20 @@
     <string name="sync_error_generic">Sync error</string>
     <string name="sync_error_background">Background sync error</string>
     <string name="config_not_found">config.toml not found</string>
+    <string name="share_to_shardkeep">Save to Shardkeep</string>
+    <string name="share_title">Title</string>
+    <string name="share_text">Text</string>
+    <string name="share_workspace">Workspace</string>
+    <string name="share_save">Save note</string>
+    <string name="share_cancel">Cancel</string>
+    <string name="share_saving">Saving…</string>
+    <string name="share_images">Images: %1$d</string>
+    <string name="share_no_workspace">Add a workspace in Shardkeep before saving.</string>
+    <string name="share_error">Could not save the note.</string>
+    <string name="notification_channel_tasks">Shardkeep tasks</string>
+    <string name="notification_channel_tasks_description">Daily reminder about today’s tasks</string>
+    <string name="workspace_default">Workspace</string>
+    <string name="workspace_numbered">Workspace %1$d</string>
+    <string name="sync_already_up_to_date">Already up to date</string>
+    <string name="sync_result_summary">Pushed %1$d, pulled %2$d</string>
 </resources>

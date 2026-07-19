@@ -12,4 +12,20 @@
     <string name="sync_error_generic">Ошибка синхронизации</string>
     <string name="sync_error_background">Ошибка фоновой синхронизации</string>
     <string name="config_not_found">config.toml не найден</string>
+    <string name="share_to_shardkeep">Сохранить в Shardkeep</string>
+    <string name="share_title">Заголовок</string>
+    <string name="share_text">Текст</string>
+    <string name="share_workspace">Воркспейс</string>
+    <string name="share_save">Сохранить заметку</string>
+    <string name="share_cancel">Отмена</string>
+    <string name="share_saving">Сохранение…</string>
+    <string name="share_images">Изображений: %1$d</string>
+    <string name="share_no_workspace">Сначала добавьте воркспейс в Shardkeep.</string>
+    <string name="share_error">Не удалось сохранить заметку.</string>
+    <string name="notification_channel_tasks">Задачи Shardkeep</string>
+    <string name="notification_channel_tasks_description">Ежедневное напоминание о задачах на сегодня</string>
+    <string name="workspace_default">Воркспейс</string>
+    <string name="workspace_numbered">Воркспейс %1$d</string>
+    <string name="sync_already_up_to_date">Уже актуально</string>
+    <string name="sync_result_summary">Отправлено %1$d, получено %2$d</string>
 </resources>

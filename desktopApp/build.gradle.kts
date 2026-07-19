@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.tresse.kmp)
 
     implementation(compose.desktop.currentOs)
+    implementation(libs.compose.components.resources)
     implementation(libs.compose.material3)
     implementation(libs.kotlinx.coroutinesSwing)
 

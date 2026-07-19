@@ -110,5 +110,18 @@
     <string name="sync_auto_indicator">· авто</string>
     <string name="syncing">Синхронизация…</string>
     <string name="sync_now">Синхронизировать</string>
-    <string name="force_pull">Force pull</string>
+    <string name="force_pull">Принудительно загрузить</string>
+    <string name="add_workspace">+ Добавить воркспейс</string>
+    <string name="storage_http">HTTP</string>
+    <string name="storage_s3">S3</string>
+    <string name="s3_endpoint_hint">https://storage.yandexcloud.net</string>
+    <string name="s3_region_hint">ru-central1</string>
+    <string name="import_config_hint">[remote]\nurl = \"https://…\"</string>
+    <string name="select_notes_directory">Выберите каталог заметок</string>
+    <string name="sync_not_configured_error">Синхронизация не настроена</string>
+    <string name="sync_trigger_desktop">Компьютер</string>
+    <string name="sync_error_generic">Ошибка синхронизации</string>
+    <string name="sync_already_up_to_date">Уже актуально</string>
+    <string name="sync_result_summary">Отправлено %1$d, получено %2$d</string>
+    <string name="workspace_default">Воркспейс</string>
 </resources>

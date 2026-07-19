@@ -27,7 +27,9 @@ class WorkspaceRegistry(context: Context) {
             val uri = item.optString("treeUri").takeIf(String::isNotBlank) ?: return@mapNotNull null
             WorkspaceRecord(
                 id = item.optString("id"),
-                name = item.optString("name").ifBlank { "Workspace ${index + 1}" },
+                name = item.optString("name").ifBlank {
+                    appContext.getString(R.string.workspace_numbered, index + 1)
+                },
                 treeUri = Uri.parse(uri),
                 taskFormat = item.optString("taskFormat").takeIf(String::isNotBlank)
                     ?.let { runCatching { TaskFormat.valueOf(it) }.getOrNull() },
@@ -46,7 +48,12 @@ class WorkspaceRegistry(context: Context) {
     }
 
     fun add(name: String, treeUri: Uri): WorkspaceRecord {
-        val record = WorkspaceRecord(UUID.randomUUID().toString(), name.ifBlank { "Workspace" }, treeUri, null)
+        val record = WorkspaceRecord(
+            UUID.randomUUID().toString(),
+            name.ifBlank { appContext.getString(R.string.workspace_default) },
+            treeUri,
+            null,
+        )
         save(list() + record)
         select(record.id)
         return record

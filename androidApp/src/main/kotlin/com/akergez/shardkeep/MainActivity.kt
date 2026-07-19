@@ -119,7 +119,8 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
             )
         }
         val name = uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')
-            ?.takeIf { it.isNotBlank() } ?: "Workspace ${workspaceRecords.size + 1}"
+            ?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.workspace_numbered, workspaceRecords.size + 1)
         val added = workspaceRegistry.add(name, uri)
         workspaceRecords = workspaceRegistry.list()
         activeWorkspaceId = added.id
@@ -271,7 +272,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                         val result = TresseSync(vault).perform(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
-                        val summary = summaryOf(result)
+                        val summary = summaryOf(applicationContext, result)
                         syncStatus.finishOk(summary, SyncStatusHolder.nowLabel())
                         summary
                     } catch (error: Throwable) {
@@ -291,7 +292,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                         val result = TresseSync(vault).forcePull(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
-                        val summary = summaryOf(result)
+                        val summary = summaryOf(applicationContext, result)
                         syncStatus.finishOk(summary, SyncStatusHolder.nowLabel())
                         summary
                     } catch (error: Throwable) {

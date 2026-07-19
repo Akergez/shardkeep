@@ -1,6 +1,8 @@
 package com.akergez.shardkeep.sync
 
 import android.content.SharedPreferences
+import android.content.Context
+import com.akergez.shardkeep.R
 import com.akergez.shardkeep.SyncStatusStore
 import com.akergez.tresse.kmp.TresseSyncProgress
 
@@ -29,9 +31,12 @@ internal fun SharedPreferences.saveLocalSync(config: TresseConfig) {
         .apply()
 }
 
-fun summaryOf(result: TresseSyncResult): String =
-    if (result.pushed == 0 && result.pulled == 0) "Уже актуально"
-    else "Отправлено ${result.pushed}, получено ${result.pulled}"
+fun summaryOf(context: Context, result: TresseSyncResult): String =
+    if (result.pushed == 0 && result.pulled == 0) {
+        context.getString(R.string.sync_already_up_to_date)
+    } else {
+        context.getString(R.string.sync_result_summary, result.pushed, result.pulled)
+    }
 
 internal fun ignoredPath(path: String, config: TresseConfig): Boolean =
     path == ".tresse" || path.startsWith(".tresse/") || path.split('/').any { it.startsWith(".") } ||

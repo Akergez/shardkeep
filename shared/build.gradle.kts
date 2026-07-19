@@ -68,6 +68,10 @@ dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
 
+compose.resources {
+    publicResClass = true
+}
+
 sqldelight {
     databases {
         create("ShardkeepDatabase") {

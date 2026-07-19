@@ -32,7 +32,7 @@ class TresseSyncWorker(
             val vault = safTresseVault(applicationContext, treeUri) { ignoredPath(it, config) }
             val result = TresseSync(vault).perform(config, status.asProgress())
             WidgetUpdater.refreshAll(applicationContext)
-            status.finishOk(summaryOf(result), SyncStatusHolder.nowLabel())
+            status.finishOk(summaryOf(applicationContext, result), SyncStatusHolder.nowLabel())
             Result.success()
         } catch (error: Throwable) {
             if (error is kotlinx.coroutines.CancellationException) throw error

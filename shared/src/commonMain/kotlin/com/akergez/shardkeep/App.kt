@@ -59,6 +59,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -161,11 +162,17 @@ import shardkeep.shared.generated.resources.refresh
 import shardkeep.shared.generated.resources.refresh_complete
 import shardkeep.shared.generated.resources.refresh_error
 import shardkeep.shared.generated.resources.add_item
+import shardkeep.shared.generated.resources.add_workspace
+import shardkeep.shared.generated.resources.import_config_hint
 import shardkeep.shared.generated.resources.note_update_error
 import shardkeep.shared.generated.resources.save
+import shardkeep.shared.generated.resources.s3_endpoint_hint
+import shardkeep.shared.generated.resources.s3_region_hint
 import shardkeep.shared.generated.resources.schedule_today
 import shardkeep.shared.generated.resources.schedule_today_error
 import shardkeep.shared.generated.resources.task_save_error
+import shardkeep.shared.generated.resources.storage_http
+import shardkeep.shared.generated.resources.storage_s3
 import shardkeep.shared.generated.resources.all_locations
 import shardkeep.shared.generated.resources.file_filter
 import shardkeep.shared.generated.resources.folder_filter
@@ -243,14 +250,20 @@ import shardkeep.shared.generated.resources.force_pull
 @Preview
 fun App() {
     MaterialTheme {
-        val today = remember { currentLocalDate() }
-        val demoConnectNotesDirectory = stringResource(Res.string.demo_connect_notes_directory)
-        val demoCheckUi = stringResource(Res.string.demo_check_ui)
-        val defaultHeading = stringResource(Res.string.default_tasks_heading)
-        val repository = remember(today, demoConnectNotesDirectory, demoCheckUi, defaultHeading) {
-            demoRepository(today, demoConnectNotesDirectory, demoCheckUi, defaultHeading)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+        ) {
+            val today = remember { currentLocalDate() }
+            val demoConnectNotesDirectory = stringResource(Res.string.demo_connect_notes_directory)
+            val demoCheckUi = stringResource(Res.string.demo_check_ui)
+            val defaultHeading = stringResource(Res.string.default_tasks_heading)
+            val repository = remember(today, demoConnectNotesDirectory, demoCheckUi, defaultHeading) {
+                demoRepository(today, demoConnectNotesDirectory, demoCheckUi, defaultHeading)
+            }
+            ShardkeepApp(repository = repository, today = today)
         }
-        ShardkeepApp(repository = repository, today = today)
     }
 }
 
@@ -506,7 +519,7 @@ fun ShardkeepApp(
                             }
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("+ Add workspace") },
+                                text = { Text(stringResource(Res.string.add_workspace)) },
                                 onClick = {
                                     workspaceMenuExpanded = false
                                     onAddWorkspace()
@@ -1367,19 +1380,19 @@ private fun SettingsContent(
             FilterChip(
                 selected = storageType != "s3",
                 onClick = { storageType = "http" },
-                label = { Text("HTTP") },
+                label = { Text(stringResource(Res.string.storage_http)) },
             )
             FilterChip(
                 selected = storageType == "s3",
                 onClick = { storageType = "s3" },
-                label = { Text("S3") },
+                label = { Text(stringResource(Res.string.storage_s3)) },
             )
         }
         OutlinedTextField(repo, { repo = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.repo_id)) }, singleLine = true)
         OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.encryption_key)) }, singleLine = true)
         if (storageType == "s3") {
-            OutlinedTextField(s3Endpoint, { s3Endpoint = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.s3_endpoint)) }, placeholder = { Text("https://storage.yandexcloud.net") }, singleLine = true)
-            OutlinedTextField(s3Region, { s3Region = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.s3_region)) }, placeholder = { Text("ru-central1") }, singleLine = true)
+            OutlinedTextField(s3Endpoint, { s3Endpoint = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.s3_endpoint)) }, placeholder = { Text(stringResource(Res.string.s3_endpoint_hint)) }, singleLine = true)
+            OutlinedTextField(s3Region, { s3Region = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.s3_region)) }, placeholder = { Text(stringResource(Res.string.s3_region_hint)) }, singleLine = true)
             OutlinedTextField(s3Bucket, { s3Bucket = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.s3_bucket)) }, singleLine = true)
             OutlinedTextField(s3AccessKeyId, { s3AccessKeyId = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.s3_access_key_id)) }, singleLine = true)
             OutlinedTextField(s3SecretAccessKey, { s3SecretAccessKey = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.s3_secret_access_key)) }, singleLine = true)
@@ -1444,7 +1457,7 @@ private fun SettingsContent(
             onValueChange = { configString = it; configImportFailed = false },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(Res.string.import_config)) },
-            placeholder = { Text("[remote]\nurl = \"https://…\"") },
+            placeholder = { Text(stringResource(Res.string.import_config_hint)) },
             minLines = 5,
         )
         if (configImportFailed) {
@@ -1601,7 +1614,11 @@ private fun SyncStatusCard(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = if (state.storageType == "s3") "S3" else "HTTP",
+                text = if (state.storageType == "s3") {
+                    stringResource(Res.string.storage_s3)
+                } else {
+                    stringResource(Res.string.storage_http)
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
