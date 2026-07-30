@@ -1,6 +1,7 @@
 package com.akergez.shardkeep.notesdirectory
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 data class NotesDirectoryPath(val value: String) {
     init {
@@ -53,65 +54,89 @@ interface NotesDirectoryStorage {
 
     fun observeChanges(): Flow<NotesDirectoryChange>
 
-    /**
-     * Every file in the notes directory (text AND binary, including dot-files), NOT
-     * just markdown. This is the file universe the CAS sync commits, and it must
-     * match the companion sync plugin's file-scan byte-for-byte so the two replicas
-     * converge instead of tombstoning each other's files.
-     *
-     * [isIgnored] is evaluated on each directory-relative path DURING traversal,
-     * exactly like the companion plugin's folder walker: an ignored directory is
-     * never descended into and an ignored file is never listed — so ignored trees
-     * (`.git`, config patterns) are not walked at all while building the file list.
-     * `.tresse` is always excluded regardless of the predicate.
-     */
-    suspend fun listAllFiles(isIgnored: (String) -> Boolean = { false }): List<NotesDirectoryFile> =
-        listMarkdownFiles()
-
-    /**
-     * Byte length of a file, resolved from stat/metadata WITHOUT reading its
-     * contents. This is the CAS engine's `fileLen` step; the notes directory can be
-     * gigabytes, so it must never pull the file into memory. The default derives the
-     * size from [read] as a fallback for in-memory test storages — real backends
-     * override it with a metadata query.
-     */
-    suspend fun fileSize(path: NotesDirectoryPath): Long = read(path).content.encodeToByteArray().size.toLong()
-
-    /**
-     * A positional slice `[offset, offset + len)` of a file's raw bytes. The CAS
-     * engine reads every file in bounded chunks through this call, so a real backend
-     * must position-read and hold ONLY the requested range in memory — never the
-     * whole file. Requests past end-of-file are clamped to what exists. The default
-     * buffers via [read] and is only for in-memory test storages.
-     */
-    suspend fun readRange(path: NotesDirectoryPath, offset: Long, len: Long): ByteArray {
-        if (len <= 0L) return ByteArray(0)
-        val bytes = read(path).content.encodeToByteArray()
-        val start = offset.coerceIn(0L, bytes.size.toLong()).toInt()
-        val end = (start.toLong() + len).coerceIn(start.toLong(), bytes.size.toLong()).toInt()
-        return bytes.copyOfRange(start, end)
-    }
-
     /** Create-or-overwrite a file with raw bytes (binary restore). */
     suspend fun writeBinary(path: NotesDirectoryPath, data: ByteArray): FileVersion =
         create(path, data.decodeToString())
+}
 
-    // ── Local CAS object store (`.tresse/{meta,content}`) ─────────────────────
-    // Raw access to the notes directory's OWN local repo — its `.git`. These operate
-    // on engine-internal object files by directory-relative path and MUST NOT emit
-    // observeChanges events (a CAS object is not user content). Defaults are
-    // no-ops for in-memory test storages that host no `.tresse`; the SAF backend
-    // overrides them. `dir`/`path` are directory-relative (e.g. `.tresse/content`).
+data class VaultFileMetadata(
+    val path: String,
+    val size: Long,
+    val modifiedAtMillis: Long,
+)
 
-    /** Direct child file names under `dir` (non-recursive); empty if absent. */
-    suspend fun storeList(dir: String): List<String> = emptyList()
+/**
+ * Shardkeep's markdown-oriented view over the single filesystem implementation
+ * supplied by tresse-kmp. Platform modules only bind these callbacks to a
+ * TresseVault; traversal, SAF/filesystem access and `.tresse` handling stay in
+ * the library.
+ */
+class VaultNotesDirectoryStorage(
+    private val listFiles: () -> List<VaultFileMetadata>,
+    private val readBytes: (path: String, offset: Long, length: Int) -> ByteArray,
+    private val writeText: (path: String, content: String) -> Unit,
+    private val writeBytes: (path: String, bytes: ByteArray) -> Unit,
+    private val deleteFile: (path: String) -> Unit,
+) : NotesDirectoryStorage {
+    private val changes = MutableSharedFlow<NotesDirectoryChange>(extraBufferCapacity = 64)
 
-    /** Raw bytes of an object file, or null if it does not exist. */
-    suspend fun storeRead(path: String): ByteArray? = null
+    override suspend fun listMarkdownFiles(): List<NotesDirectoryFile> =
+        listFiles().asSequence()
+            .filter { it.path.endsWith(".md", ignoreCase = true) }
+            .map {
+                val path = NotesDirectoryPath(it.path)
+                NotesDirectoryFile(path, metadataVersion(it), it.size, it.modifiedAtMillis)
+            }
+            .toList()
 
-    /** Create-or-overwrite an object file, creating parent dirs as needed. */
-    suspend fun storeWrite(path: String, data: ByteArray) {}
+    override suspend fun read(path: NotesDirectoryPath): NotesDirectoryDocument {
+        val file = metadata(path) ?: throw NotesDirectoryException.NotFound(path)
+        require(file.size <= Int.MAX_VALUE) { "Text file is too large: ${path.value}" }
+        val content = readBytes(path.value, 0, file.size.toInt()).decodeToString()
+        return NotesDirectoryDocument(path, contentVersion(content), content)
+    }
 
-    /** Delete an object file. Idempotent — a missing file is not an error. */
-    suspend fun storeDelete(path: String) {}
+    override suspend fun write(
+        path: NotesDirectoryPath,
+        expectedVersion: FileVersion,
+        content: String,
+    ): FileVersion {
+        val current = read(path)
+        if (current.version != expectedVersion) throw NotesDirectoryException.Conflict(path)
+        writeText(path.value, content)
+        changes.tryEmit(NotesDirectoryChange.Modified(path))
+        return contentVersion(content)
+    }
+
+    override suspend fun create(path: NotesDirectoryPath, content: String): FileVersion {
+        if (metadata(path) != null) throw NotesDirectoryException.Conflict(path)
+        writeText(path.value, content)
+        changes.tryEmit(NotesDirectoryChange.Created(path))
+        return contentVersion(content)
+    }
+
+    override suspend fun writeBinary(path: NotesDirectoryPath, data: ByteArray): FileVersion {
+        val existed = metadata(path) != null
+        writeBytes(path.value, data)
+        changes.tryEmit(
+            if (existed) NotesDirectoryChange.Modified(path) else NotesDirectoryChange.Created(path),
+        )
+        return FileVersion("${data.size}:${data.contentHashCode()}")
+    }
+
+    override suspend fun delete(path: NotesDirectoryPath) {
+        if (metadata(path) == null) throw NotesDirectoryException.NotFound(path)
+        deleteFile(path.value)
+        changes.tryEmit(NotesDirectoryChange.Deleted(path))
+    }
+
+    override fun observeChanges(): Flow<NotesDirectoryChange> = changes
+
+    private fun metadata(path: NotesDirectoryPath): VaultFileMetadata? =
+        listFiles().firstOrNull { it.path == path.value }
+
+    private fun metadataVersion(file: VaultFileMetadata) =
+        FileVersion("${file.modifiedAtMillis}:${file.size}")
+
+    private fun contentVersion(content: String) = FileVersion("${content.length}:${content.hashCode()}")
 }

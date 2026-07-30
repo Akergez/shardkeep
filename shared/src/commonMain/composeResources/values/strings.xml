@@ -79,7 +79,7 @@
     <string name="settings_saved">Settings saved</string>
     <string name="no_settings_available">No settings available.</string>
     <string name="sync_title">Sync</string>
-    <string name="sync_config_hint">Connection parameters are stored only in .tresse/config.toml inside the notes directory.</string>
+    <string name="sync_config_hint">Connection parameters are stored in tresse.toml at the notes directory root.</string>
     <string name="repo_id">Repository ID</string>
     <string name="encryption_key">Encryption key</string>
     <string name="s3_endpoint">S3 endpoint</string>
@@ -93,7 +93,7 @@
     <string name="sync_interval_minutes">Interval (minutes)</string>
     <string name="sync_debounce_seconds">Debounce (seconds)</string>
     <string name="ignore_patterns">Ignore patterns (one per line)</string>
-    <string name="import_config">Import config.toml or config string</string>
+    <string name="import_config">Import tresse.toml or config string</string>
     <string name="config_import_error">Invalid or unsupported Tresse config</string>
     <string name="action_import">Import</string>
     <string name="sync_phase_idle">Ready to sync</string>

@@ -268,7 +268,7 @@ fun App() {
 }
 
 /**
- * Editable view of the Tresse sync config. The `.tresse/config.toml` file in the notes directory
+ * Editable view of the Tresse sync config. The `tresse.toml` file in the notes-directory root
  * is the single source of truth — this draft is read from it and written straight back to it; there is
  * no separate internal store of these settings.
  */

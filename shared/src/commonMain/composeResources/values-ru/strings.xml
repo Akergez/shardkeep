@@ -79,7 +79,7 @@
     <string name="settings_saved">Настройки сохранены</string>
     <string name="no_settings_available">Настройки недоступны.</string>
     <string name="sync_title">Синхронизация</string>
-    <string name="sync_config_hint">Параметры подключения — хранятся только в .tresse/config.toml внутри каталога заметок.</string>
+    <string name="sync_config_hint">Параметры подключения хранятся в tresse.toml в корне каталога заметок.</string>
     <string name="repo_id">ID репозитория</string>
     <string name="encryption_key">Ключ шифрования</string>
     <string name="s3_endpoint">S3 endpoint</string>
@@ -93,7 +93,7 @@
     <string name="sync_interval_minutes">Интервал (минуты)</string>
     <string name="sync_debounce_seconds">Задержка (секунды)</string>
     <string name="ignore_patterns">Паттерны игнорирования (по одному на строку)</string>
-    <string name="import_config">Импорт config.toml или строки конфига</string>
+    <string name="import_config">Импорт tresse.toml или строки конфига</string>
     <string name="config_import_error">Недопустимая или неподдерживаемая конфигурация Tresse</string>
     <string name="action_import">Импортировать</string>
     <string name="sync_phase_idle">Готово к синхронизации</string>

@@ -15,7 +15,7 @@
     <string name="sync_trigger_background">Background</string>
     <string name="sync_error_generic">Sync error</string>
     <string name="sync_error_background">Background sync error</string>
-    <string name="config_not_found">config.toml not found</string>
+    <string name="config_not_found">tresse.toml not found</string>
     <string name="share_to_shardkeep">Save to Shardkeep</string>
     <string name="share_title">Title</string>
     <string name="share_text">Text</string>

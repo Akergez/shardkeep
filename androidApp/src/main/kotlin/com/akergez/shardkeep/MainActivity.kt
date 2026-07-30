@@ -45,7 +45,6 @@ import com.akergez.shardkeep.sync.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.safTresseVault
-import com.akergez.shardkeep.sync.TresseConfigFile
 import com.akergez.shardkeep.sync.TresseSyncScheduler
 import com.akergez.shardkeep.sync.SyncStatusHolder
 import com.akergez.shardkeep.sync.asProgress
@@ -66,7 +65,7 @@ class MainActivity : ComponentActivity() {
         WorkspaceRegistry(this).list().forEach { workspace ->
             NotificationScheduler.scheduleNext(this, workspace.id)
         }
-        // These remote/credential fields live in config.toml. The [sync] fields
+        // These remote/credential fields live in tresse.toml. The [sync] fields
         // (sync_auto_enabled / sync_interval_minutes / sync_debounce_seconds) are
         // device-local and intentionally kept in SharedPreferences.
         getSharedPreferences("notes_directory", Context.MODE_PRIVATE).edit()
@@ -165,6 +164,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
     }
     val database = remember { createDatabase(DatabaseDriverFactory(applicationContext)) }
     val storage = remember(uri) { AndroidSafNotesDirectoryStorage(applicationContext, uri) }
+    val configSync = remember(uri) { TresseSync(safTresseVault(applicationContext, uri)) }
     var syncConfig by remember(storage) { mutableStateOf<TresseConfig?>(null) }
     val taskSource = remember(storage, format) { NotesDirectoryTaskRepository(storage, format, database = database) }
     val repository = remember(taskSource) { WidgetUpdatingTaskRepository(taskSource, applicationContext) }
@@ -177,7 +177,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
     val today = remember { currentLocalDate() }
 
     LaunchedEffect(storage, refreshKey) {
-        val config = runCatching { TresseConfigFile.read(storage) }.getOrNull()
+        val config = runCatching { configSync.loadConfig() }.getOrNull()
             ?.withLocalSync(preferences)
         syncConfig = config
         pushSyncStatus(syncStatus, config)
@@ -245,7 +245,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 onSyncConfigChange = { draft ->
                     val updated = draft.toTresseConfig()
                     preferences.saveLocalSync(updated)
-                    TresseConfigFile.write(storage, updated)
+                    configSync.saveConfig(updated)
                     syncConfig = updated
                     pushSyncStatus(syncStatus, updated)
                     TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, updated)
@@ -254,7 +254,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     runCatching { TresseConfigString.decode(configString) }.fold(
                         onSuccess = { imported ->
                             preferences.saveLocalSync(imported)
-                            TresseConfigFile.write(storage, imported)
+                            configSync.saveConfig(imported)
                             syncConfig = imported
                             pushSyncStatus(syncStatus, imported)
                             TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, imported)
@@ -266,7 +266,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 onSync = {
                     syncStatus.begin(getString(R.string.sync_trigger_manual))
                     try {
-                        val config = requireNotNull(TresseConfigFile.read(storage)) { getString(R.string.config_not_found) }
+                        val config = requireNotNull(configSync.loadConfig()) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
                         val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
                         val result = TresseSync(vault).perform(config, syncStatus.asProgress())
@@ -286,7 +286,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 onForcePull = {
                     syncStatus.begin(getString(R.string.sync_trigger_manual))
                     try {
-                        val config = requireNotNull(TresseConfigFile.read(storage)) { getString(R.string.config_not_found) }
+                        val config = requireNotNull(configSync.loadConfig()) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
                         val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
                         val result = TresseSync(vault).forcePull(config, syncStatus.asProgress())

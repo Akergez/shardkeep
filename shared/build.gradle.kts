@@ -35,7 +35,6 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.documentfile)
             implementation(libs.sqldelight.android.driver)
         }
         commonMain.dependencies {

@@ -6,7 +6,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.akergez.shardkeep.R
 import com.akergez.shardkeep.WorkspaceRegistry
-import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
 import com.akergez.shardkeep.widget.WidgetUpdater
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.safTresseVault
@@ -23,8 +22,8 @@ class TresseSyncWorker(
         val treeUri = workspace.treeUri
         val status = SyncStatusHolder.storeFor(workspaceId)
         return try {
-            val storage = AndroidSafNotesDirectoryStorage(applicationContext, treeUri)
-            val config = (TresseConfigFile.read(storage) ?: return Result.success())
+            val configVault = safTresseVault(applicationContext, treeUri)
+            val config = (TresseSync(configVault).loadConfig() ?: return Result.success())
                 .withLocalSync(prefs)
             if (!config.isComplete()) return Result.success()
             if (!config.autoSyncEnabled && !inputData.getBoolean(KEY_FORCE, false)) return Result.success()
