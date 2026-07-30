@@ -287,6 +287,14 @@ data class SyncConfigDraft(
     val autoSyncIntervalMinutes: Long = 15,
     val autoSyncDebounceSeconds: Long = 10,
     val ignorePatterns: List<String> = listOf(".git", ".trash", ".obsidian"),
+    val languages: Map<String, String>? = null,
+)
+
+data class SyncLanguageOption(
+    val id: String,
+    val description: String,
+    val extensions: List<String>,
+    val strategies: List<String>,
 )
 
 data class SettingsCallbacks(
@@ -295,6 +303,7 @@ data class SettingsCallbacks(
     val notificationsEnabled: Boolean,
     val onNotificationsEnabledChange: (Boolean) -> Unit,
     val syncConfig: SyncConfigDraft? = null,
+    val supportedLanguages: List<SyncLanguageOption> = emptyList(),
     val onSyncConfigChange: suspend (SyncConfigDraft) -> Unit = { },
     val onImportSyncConfig: suspend (String) -> Boolean = { false },
     /** Runs a sync and returns a short human-readable summary; throws on failure. */
@@ -1375,6 +1384,7 @@ private fun SettingsContent(
         var interval by rememberSaveable(current) { mutableStateOf(current.autoSyncIntervalMinutes.toString()) }
         var debounce by rememberSaveable(current) { mutableStateOf(current.autoSyncDebounceSeconds.toString()) }
         var ignore by rememberSaveable(current) { mutableStateOf(current.ignorePatterns.joinToString("\n")) }
+        var languages by remember(current) { mutableStateOf(current.languages ?: emptyMap()) }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
@@ -1431,6 +1441,30 @@ private fun SettingsContent(
             label = { Text(stringResource(Res.string.ignore_patterns)) },
             minLines = 2,
         )
+        callbacks.supportedLanguages.forEach { language ->
+            Text(
+                "${language.description} (${language.extensions.joinToString()})",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                language.strategies.forEach { strategy ->
+                    FilterChip(
+                        selected = languages[language.id] == strategy,
+                        onClick = {
+                            languages = if (languages[language.id] == strategy) {
+                                languages - language.id
+                            } else {
+                                languages + (language.id to strategy)
+                            }
+                        },
+                        label = { Text(strategy) },
+                    )
+                }
+            }
+        }
         val buildDraft = {
             SyncConfigDraft(
                 serverUrl = server.trim(),
@@ -1447,6 +1481,7 @@ private fun SettingsContent(
                 autoSyncIntervalMinutes = interval.toLongOrNull() ?: current.autoSyncIntervalMinutes,
                 autoSyncDebounceSeconds = debounce.toLongOrNull() ?: current.autoSyncDebounceSeconds,
                 ignorePatterns = ignore.split("\n").map { it.trim() }.filter { it.isNotEmpty() },
+                languages = languages,
             )
         }
 

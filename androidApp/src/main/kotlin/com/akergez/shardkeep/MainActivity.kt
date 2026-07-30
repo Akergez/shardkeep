@@ -43,6 +43,7 @@ import com.akergez.shardkeep.widget.WidgetUpdatingQuickNoteRepository
 import com.akergez.shardkeep.widget.WidgetUpdatingTaskRepository
 import com.akergez.shardkeep.sync.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
+import com.akergez.tresse.kmp.TresseCapabilities
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.safTresseVault
 import com.akergez.shardkeep.sync.TresseSyncScheduler
@@ -242,6 +243,14 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     else NotificationScheduler.cancel(applicationContext, activeWorkspace.id)
                 },
                 syncConfig = syncConfig?.toDraft(),
+                supportedLanguages = TresseCapabilities.supportedLanguages().map { language ->
+                    SyncLanguageOption(
+                        language.id,
+                        language.description,
+                        language.extensions,
+                        language.strategies.map { it.id },
+                    )
+                },
                 onSyncConfigChange = { draft ->
                     val updated = draft.toTresseConfig()
                     preferences.saveLocalSync(updated)
@@ -334,6 +343,7 @@ private fun TresseConfig.toDraft() = SyncConfigDraft(
     autoSyncIntervalMinutes = autoSyncIntervalMinutes,
     autoSyncDebounceSeconds = autoSyncDebounceSeconds,
     ignorePatterns = ignorePatterns,
+    languages = languages,
 )
 
 private fun SyncConfigDraft.toTresseConfig() = TresseConfig(
@@ -348,6 +358,7 @@ private fun SyncConfigDraft.toTresseConfig() = TresseConfig(
     s3AccessKeyId = s3AccessKeyId,
     s3SecretAccessKey = s3SecretAccessKey,
     ignorePatterns = ignorePatterns,
+    languages = languages,
     autoSyncEnabled = autoSyncEnabled,
     autoSyncIntervalMinutes = autoSyncIntervalMinutes,
     autoSyncDebounceSeconds = autoSyncDebounceSeconds,

@@ -19,7 +19,7 @@ junit = "4.13.2"
 kotlin = "2.4.0"
 kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.10.0"
-tresse-kmp = "0.1.2"
+tresse-kmp = "0.2.0"
 material3 = "1.11.0-alpha07"
 
 [libraries]
