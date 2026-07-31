@@ -43,7 +43,6 @@ import com.akergez.shardkeep.widget.WidgetUpdatingQuickNoteRepository
 import com.akergez.shardkeep.widget.WidgetUpdatingTaskRepository
 import com.akergez.shardkeep.sync.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
-import com.akergez.tresse.kmp.TresseCapabilities
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.safTresseVault
 import com.akergez.shardkeep.sync.TresseSyncScheduler
@@ -243,16 +242,10 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     else NotificationScheduler.cancel(applicationContext, activeWorkspace.id)
                 },
                 syncConfig = syncConfig?.toDraft(),
-                supportedLanguages = TresseCapabilities.supportedLanguages().map { language ->
-                    SyncLanguageOption(
-                        language.id,
-                        language.description,
-                        language.extensions,
-                        language.strategies.map { it.id },
-                    )
-                },
                 onSyncConfigChange = { draft ->
-                    val updated = draft.toTresseConfig()
+                    val updated = draft.toTresseConfig(
+                        syncConfig?.languages ?: TresseConfig().languages,
+                    )
                     preferences.saveLocalSync(updated)
                     configSync.saveConfig(updated)
                     syncConfig = updated
@@ -261,7 +254,10 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 },
                 onImportSyncConfig = { configString ->
                     runCatching { TresseConfigString.decode(configString) }.fold(
-                        onSuccess = { imported ->
+                        onSuccess = { decoded ->
+                            val imported = decoded.copy(
+                                languages = syncConfig?.languages ?: TresseConfig().languages,
+                            )
                             preferences.saveLocalSync(imported)
                             configSync.saveConfig(imported)
                             syncConfig = imported
@@ -343,10 +339,9 @@ private fun TresseConfig.toDraft() = SyncConfigDraft(
     autoSyncIntervalMinutes = autoSyncIntervalMinutes,
     autoSyncDebounceSeconds = autoSyncDebounceSeconds,
     ignorePatterns = ignorePatterns,
-    languages = languages,
 )
 
-private fun SyncConfigDraft.toTresseConfig() = TresseConfig(
+private fun SyncConfigDraft.toTresseConfig(languages: Map<String, String>?) = TresseConfig(
     serverUrl = serverUrl,
     repoId = repoId,
     token = token,

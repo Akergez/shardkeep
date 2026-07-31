@@ -16,7 +16,6 @@ import shardkeep.shared.generated.resources.Res
 import shardkeep.shared.generated.resources.*
 import com.akergez.tresse.kmp.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
-import com.akergez.tresse.kmp.TresseCapabilities
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.TresseSyncProgress
 import com.akergez.tresse.kmp.fileTresseVault
@@ -200,16 +199,10 @@ private fun DesktopShardkeepApp() {
                 notificationsEnabled = false,
                 onNotificationsEnabledChange = {},
                 syncConfig = (syncConfig ?: TresseConfig(autoSyncEnabled = false)).toDraft(),
-                supportedLanguages = TresseCapabilities.supportedLanguages().map { language ->
-                    SyncLanguageOption(
-                        language.id,
-                        language.description,
-                        language.extensions,
-                        language.strategies.map { it.id },
-                    )
-                },
                 onSyncConfigChange = { draft ->
-                    val config = draft.toConfig()
+                    val config = draft.toConfig(
+                        syncConfig?.languages ?: TresseConfig().languages,
+                    )
                     syncEngine(config).saveConfig(config)
                     preferences.saveLocalSync(config)
                     syncConfig = config
@@ -217,10 +210,13 @@ private fun DesktopShardkeepApp() {
                 },
                 onImportSyncConfig = { encoded ->
                     runCatching { TresseConfigString.decode(encoded) }.fold(
-                        onSuccess = {
-                            syncEngine(it).saveConfig(it)
-                            preferences.saveLocalSync(it)
-                            syncConfig = it
+                        onSuccess = { decoded ->
+                            val imported = decoded.copy(
+                                languages = syncConfig?.languages ?: TresseConfig().languages,
+                            )
+                            syncEngine(imported).saveConfig(imported)
+                            preferences.saveLocalSync(imported)
+                            syncConfig = imported
                             true
                         },
                         onFailure = { false },
@@ -246,12 +242,23 @@ private fun SyncStatusStore.progress() = object : TresseSyncProgress {
 }
 
 private fun TresseConfig.toDraft() = SyncConfigDraft(
-    serverUrl, repoId, token, encryptionKey, storageType, s3Endpoint, s3Region, s3Bucket,
-    s3AccessKeyId, s3SecretAccessKey, autoSyncEnabled, autoSyncIntervalMinutes,
-    autoSyncDebounceSeconds, ignorePatterns, languages,
+    serverUrl = serverUrl,
+    repoId = repoId,
+    token = token,
+    encryptionKey = encryptionKey,
+    storageType = storageType,
+    s3Endpoint = s3Endpoint,
+    s3Region = s3Region,
+    s3Bucket = s3Bucket,
+    s3AccessKeyId = s3AccessKeyId,
+    s3SecretAccessKey = s3SecretAccessKey,
+    autoSyncEnabled = autoSyncEnabled,
+    autoSyncIntervalMinutes = autoSyncIntervalMinutes,
+    autoSyncDebounceSeconds = autoSyncDebounceSeconds,
+    ignorePatterns = ignorePatterns,
 )
 
-private fun SyncConfigDraft.toConfig() = TresseConfig(
+private fun SyncConfigDraft.toConfig(languages: Map<String, String>?) = TresseConfig(
     serverUrl = serverUrl,
     repoId = repoId,
     token = token,
