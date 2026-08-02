@@ -112,6 +112,28 @@ build:macos-arm64:
       - desktopApp/build/compose/binaries/main/dmg/*.dmg
     expire_in: 1 week
 
+# PowerShell runner. jpackage builds the MSI itself but shells out to WiX v3 for
+# it, and neither WiX nor a JDK is on the image, so both are fetched here.
+build:windows-x86_64:
+  stage: build
+  tags:
+    - saas-windows-medium-amd64
+  <<: [*gradle_cache, *tag_rules]
+  before_script:
+    - Invoke-WebRequest -Uri "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip" -OutFile jdk.zip
+    - Expand-Archive -Path jdk.zip -DestinationPath "$env:CI_PROJECT_DIR\.jdk" -Force
+    - $env:JAVA_HOME = (Get-ChildItem "$env:CI_PROJECT_DIR\.jdk" -Directory | Select-Object -First 1).FullName
+    - $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+    - java -version
+    - choco install wixtoolset --version 3.14.1 -y --no-progress
+    - $env:PATH = "$env:PATH;${env:ProgramFiles(x86)}\WiX Toolset v3.14\bin"
+  script:
+    - .\gradlew.bat --no-daemon :desktopApp:packageMsi
+  artifacts:
+    paths:
+      - desktopApp/build/compose/binaries/main/msi/*.msi
+    expire_in: 1 week
+
 package:publish:
   stage: package
   image: curlimages/curl:latest
@@ -123,6 +145,8 @@ package:publish:
     - job: build:linux-arm64
       artifacts: true
     - job: build:macos-arm64
+      artifacts: true
+    - job: build:windows-x86_64
       artifacts: true
   script:
     - PACKAGE_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}"
@@ -143,6 +167,10 @@ package:publish:
       DMG=$(find desktopApp/build/compose/binaries/main/dmg -name '*.dmg' -type f -print -quit)
       test -n "$DMG"
       curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$DMG" "${PACKAGE_URL}/Shardkeep-${CI_COMMIT_TAG}-macOS-arm64.dmg"
+    - |
+      MSI=$(find desktopApp/build/compose/binaries/main/msi -name '*.msi' -type f -print -quit)
+      test -n "$MSI"
+      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$MSI" "${PACKAGE_URL}/Shardkeep-${CI_COMMIT_TAG}-windows-x86_64.msi"
   <<: *tag_rules
 
 release:
@@ -161,6 +189,7 @@ release:
       - Linux RPM (x86_64)
       - Linux RPM (arm64)
       - macOS DMG (arm64)
+      - Windows MSI (x86_64)
     assets:
       links:
         - name: "Android APK"
@@ -174,5 +203,8 @@ release:
           link_type: package
         - name: "macOS DMG (arm64)"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}-macOS-arm64.dmg"
+          link_type: package
+        - name: "Windows MSI (x86_64)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/shardkeep/${CI_COMMIT_TAG}/Shardkeep-${CI_COMMIT_TAG}-windows-x86_64.msi"
           link_type: package
   <<: *tag_rules

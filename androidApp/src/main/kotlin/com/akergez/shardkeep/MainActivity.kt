@@ -48,7 +48,7 @@ import com.akergez.tresse.kmp.safTresseVault
 import com.akergez.shardkeep.sync.TresseSyncScheduler
 import com.akergez.shardkeep.sync.SyncStatusHolder
 import com.akergez.shardkeep.sync.asProgress
-import com.akergez.shardkeep.sync.ignoredPath
+import com.akergez.shardkeep.sync.ignoreFilter
 import com.akergez.shardkeep.sync.summaryOf
 import com.akergez.shardkeep.sync.saveLocalSync
 import com.akergez.shardkeep.sync.withLocalSync
@@ -181,8 +181,13 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
     val today = remember { currentLocalDate() }
 
     LaunchedEffect(storage, refreshKey) {
-        val config = runCatching { configSync.loadConfig() }.getOrNull()
-            ?.withLocalSync(preferences)
+        // Нет файла — заводим его с образцами приложения. Иначе синк пошёл бы по
+        // правилам, которых в конфиге нет, а другая реплика прочла бы каталог
+        // иначе и стёрла бы у нас файлы.
+        val config = runCatching {
+            configSync.loadConfig() ?: TresseConfig(ignorePatterns = DEFAULT_IGNORE_PATTERNS)
+                .also { configSync.saveConfig(it) }
+        }.getOrNull()?.withLocalSync(preferences)
         syncConfig = config
         pushSyncStatus(syncStatus, config)
         TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, config)
@@ -277,7 +282,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     try {
                         val config = requireNotNull(configSync.loadConfig()) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
-                        val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
+                        val vault = safTresseVault(applicationContext, uri, ignoreFilter(config))
                         val result = TresseSync(vault).perform(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
@@ -297,7 +302,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     try {
                         val config = requireNotNull(configSync.loadConfig()) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
-                        val vault = safTresseVault(applicationContext, uri) { ignoredPath(it, config) }
+                        val vault = safTresseVault(applicationContext, uri, ignoreFilter(config))
                         val result = TresseSync(vault).forcePull(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
@@ -320,10 +325,10 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     }
                     // The store is gone, so the replica must not keep claiming the
                     // repository it belonged to; the storage coordinates stay.
-                    val cleared = (TresseConfigFile.read(storage) ?: TresseConfig())
+                    val cleared = (configSync.loadConfig() ?: TresseConfig())
                         .withLocalSync(preferences)
                         .withoutRepository()
-                    TresseConfigFile.write(storage, cleared)
+                    configSync.saveConfig(cleared)
                     preferences.saveLocalSync(cleared)
                     syncConfig = cleared
                     pushSyncStatus(syncStatus, cleared)

@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import android.content.Context
 import com.akergez.shardkeep.R
 import com.akergez.shardkeep.SyncStatusStore
+import com.akergez.tresse.kmp.TresseIgnore
 import com.akergez.tresse.kmp.TresseSyncProgress
 
 typealias TresseConfig = com.akergez.tresse.kmp.TresseConfig
@@ -38,9 +39,18 @@ fun summaryOf(context: Context, result: TresseSyncResult): String =
         context.getString(R.string.sync_result_summary, result.pushed, result.pulled)
     }
 
-internal fun ignoredPath(path: String, config: TresseConfig): Boolean =
-    path == ".tresse" || path.startsWith(".tresse/") || path.split('/').any { it.startsWith(".") } ||
-        config.ignorePatterns.any { it.isNotBlank() && (path == it || path.startsWith("$it/")) }
+/**
+ * Path filter for the notes-directory walk, compiled once per vault. It is the
+ * engine's own matcher and must stay that way: a replica that disagrees about which
+ * files exist commits their absence, and the other devices then delete them.
+ *
+ * The rules outlive the returned lambda by capture; the native handle is reclaimed
+ * once the vault holding it is unreachable.
+ */
+internal fun ignoreFilter(config: TresseConfig): (String) -> Boolean {
+    val rules = TresseIgnore(config.ignorePatterns)
+    return { path -> rules.isIgnored(path, false) }
+}
 
 internal fun SyncStatusStore.asProgress(): TresseSyncProgress = object : TresseSyncProgress {
     override fun reportCommitRead() = this@asProgress.reportCommitRead()

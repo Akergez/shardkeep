@@ -16,6 +16,7 @@ import shardkeep.shared.generated.resources.Res
 import shardkeep.shared.generated.resources.*
 import com.akergez.tresse.kmp.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
+import com.akergez.tresse.kmp.TresseIgnore
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.TresseSyncProgress
 import com.akergez.tresse.kmp.TresseVault
@@ -112,7 +113,7 @@ private fun DesktopShardkeepApp() {
         val syncMutex = remember(activeWorkspace.id) { Mutex() }
         var syncConfig by remember(storage) { mutableStateOf<TresseConfig?>(null) }
 
-        fun syncEngine(config: TresseConfig) = TresseSync(fileTresseVault(root) { ignoredPath(it, config) })
+        fun syncEngine(config: TresseConfig) = TresseSync(fileTresseVault(root, ignoreFilter(config)))
         suspend fun refresh() {
             taskRepository.refresh()
             quickNoteRepository.refresh()
@@ -142,10 +143,15 @@ private fun DesktopShardkeepApp() {
         LaunchedEffect(storage, quickNoteRepository) {
             refresh()
             val engine = TresseSync(fileTresseVault(root))
-            syncConfig = (engine.loadConfig() ?: TresseConfig(
+            // Нет файла — значит каталог видит нас впервые: заводим `tresse.toml`
+            // с образцами приложения и дальше живём по нему. Держать их только в
+            // памяти нельзя: тогда синк шёл бы по правилам, которых в конфиге нет,
+            // а другая реплика прочла бы каталог иначе и стёрла бы у нас файлы.
+            val stored = engine.loadConfig() ?: TresseConfig(
                 autoSyncEnabled = false,
-                ignorePatterns = listOf(".git", ".trash", ".obsidian"),
-            )).withLocalSync(preferences)
+                ignorePatterns = DEFAULT_IGNORE_PATTERNS,
+            ).also { engine.saveConfig(it) }
+            syncConfig = stored.withLocalSync(preferences)
             syncConfig?.let { syncStore.updateConfig(it.storageType, it.isComplete(), it.autoSyncEnabled) }
         }
 
@@ -165,7 +171,7 @@ private fun DesktopShardkeepApp() {
                     if (now - (lastRuns[workspace.id] ?: 0L) < interval) return@forEach
                     lastRuns[workspace.id] = now
                     runCatching {
-                        TresseSync(fileTresseVault(directory) { ignoredPath(it, config) }).perform(config)
+                        TresseSync(fileTresseVault(directory, ignoreFilter(config))).perform(config)
                     }.onSuccess {
                         if (workspace.id == activeWorkspace.id) refresh()
                     }
@@ -243,9 +249,18 @@ private fun DesktopShardkeepApp() {
     }
 }
 
-private fun ignoredPath(path: String, config: TresseConfig): Boolean =
-    path == ".tresse" || path.startsWith(".tresse/") ||
-        config.ignorePatterns.any { it.isNotBlank() && (path == it || path.startsWith("$it/")) }
+/**
+ * Path filter for the notes-directory walk, compiled once per vault. It is the
+ * engine's own matcher and must stay that way: a replica that disagrees about which
+ * files exist commits their absence, and the other devices then delete them.
+ *
+ * The rules outlive the returned lambda by capture; the native handle is reclaimed
+ * once the vault holding it is unreachable.
+ */
+private fun ignoreFilter(config: TresseConfig): (String) -> Boolean {
+    val rules = TresseIgnore(config.ignorePatterns)
+    return { path -> rules.isIgnored(path, false) }
+}
 
 /** Object classes of the local CAS; everything under them is regenerable from a sync. */
 private val STORE_DIRS = listOf(".tresse/meta", ".tresse/content")

@@ -28,7 +28,7 @@ class TresseSyncWorker(
             if (!config.isComplete()) return Result.success()
             if (!config.autoSyncEnabled && !inputData.getBoolean(KEY_FORCE, false)) return Result.success()
             status.begin(applicationContext.getString(R.string.sync_trigger_background))
-            val vault = safTresseVault(applicationContext, treeUri) { ignoredPath(it, config) }
+            val vault = safTresseVault(applicationContext, treeUri, ignoreFilter(config))
             val result = TresseSync(vault).perform(config, status.asProgress())
             WidgetUpdater.refreshAll(applicationContext)
             status.finishOk(summaryOf(applicationContext, result), SyncStatusHolder.nowLabel())
