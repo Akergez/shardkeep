@@ -134,7 +134,7 @@ build:windows-x86_64:
     - Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" -OutFile wix.zip
     - Expand-Archive -Path wix.zip -DestinationPath "$env:CI_PROJECT_DIR\.wix" -Force
     - $env:PATH = "$env:CI_PROJECT_DIR\.wix;$env:PATH"
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\.wix\candle.exe")) { throw "WiX archive layout changed: candle.exe is not at the archive root" }
+    - 'if (-not (Test-Path "$env:CI_PROJECT_DIR\.wix\candle.exe")) { throw "candle.exe is not at the WiX archive root" }'
   script:
     - .\gradlew.bat --no-daemon :desktopApp:packageMsi
   artifacts:
