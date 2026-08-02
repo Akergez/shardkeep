@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Switch
@@ -245,6 +246,10 @@ import shardkeep.shared.generated.resources.sync_auto_indicator
 import shardkeep.shared.generated.resources.syncing
 import shardkeep.shared.generated.resources.sync_now
 import shardkeep.shared.generated.resources.force_pull
+import shardkeep.shared.generated.resources.wipe_chunks
+import shardkeep.shared.generated.resources.wipe_chunks_action
+import shardkeep.shared.generated.resources.wipe_chunks_confirm
+import shardkeep.shared.generated.resources.wipe_chunks_hint
 
 @Composable
 @Preview
@@ -301,6 +306,11 @@ data class SettingsCallbacks(
     val onSync: (suspend () -> String)? = null,
     /** Pulls remote state into an uninitialized local vault without committing first. */
     val onForcePull: (suspend () -> String)? = null,
+    /**
+     * Drops the local chunk store and clears the repository id and encryption key
+     * from the config, leaving the notes and the remote store alone.
+     */
+    val onWipeChunks: (suspend () -> Unit)? = null,
     /** Live sync status (manual + background); when null, the status panel is hidden. */
     val syncState: StateFlow<SyncState>? = null,
 )
@@ -1480,6 +1490,47 @@ private fun SettingsContent(
                     onSaved()
                 }
             }) { Text(stringResource(Res.string.save)) }
+        }
+
+        callbacks.onWipeChunks?.let { wipe ->
+            var wiping by remember { mutableStateOf(false) }
+            var confirmWipe by rememberSaveable { mutableStateOf(false) }
+            Text(
+                stringResource(Res.string.wipe_chunks_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                onClick = { confirmWipe = true },
+                enabled = !wiping,
+                modifier = Modifier.align(Alignment.End),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) { Text(stringResource(Res.string.wipe_chunks)) }
+            if (confirmWipe) {
+                AlertDialog(
+                    onDismissRequest = { confirmWipe = false },
+                    title = { Text(stringResource(Res.string.wipe_chunks)) },
+                    text = { Text(stringResource(Res.string.wipe_chunks_confirm)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirmWipe = false
+                            scope.launch {
+                                wiping = true
+                                runCatching { wipe() }
+                                wiping = false
+                                onSaved()
+                            }
+                        }) { Text(stringResource(Res.string.wipe_chunks_action)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmWipe = false }) {
+                            Text(stringResource(Res.string.cancel))
+                        }
+                    },
+                )
+            }
         }
 
         HorizontalDivider()

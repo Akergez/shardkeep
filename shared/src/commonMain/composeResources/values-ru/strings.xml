@@ -111,6 +111,10 @@
     <string name="syncing">Синхронизация…</string>
     <string name="sync_now">Синхронизировать</string>
     <string name="force_pull">Принудительно загрузить</string>
+    <string name="wipe_chunks">Очистить локальные чанки</string>
+    <string name="wipe_chunks_hint">Удаляет локальное хранилище чанков Tresse и очищает ID репозитория и ключ шифрования. Заметки и удалённое хранилище не затрагиваются.</string>
+    <string name="wipe_chunks_confirm">Все локально сохранённые чанки будут удалены, а ID репозитория и ключ шифрования — очищены. Без копии ключа расшифровать уже отправленные на сервер версии не получится.</string>
+    <string name="wipe_chunks_action">Очистить</string>
     <string name="add_workspace">+ Добавить воркспейс</string>
     <string name="storage_http">HTTP</string>
     <string name="storage_s3">S3</string>

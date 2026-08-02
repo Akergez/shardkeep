@@ -18,6 +18,7 @@ import com.akergez.tresse.kmp.TresseConfig
 import com.akergez.tresse.kmp.TresseConfigString
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.TresseSyncProgress
+import com.akergez.tresse.kmp.TresseVault
 import com.akergez.tresse.kmp.fileTresseVault
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -224,6 +225,18 @@ private fun DesktopShardkeepApp() {
                 },
                 onSync = { perform(false) },
                 onForcePull = { perform(true) },
+                onWipeChunks = {
+                    syncMutex.withLock {
+                        val vault = fileTresseVault(root)
+                        wipeChunkStore(vault)
+                        // The store is gone, so the replica must not keep claiming the
+                        // repository it belonged to; the storage coordinates stay.
+                        val cleared = (syncConfig ?: TresseConfig()).withoutRepository()
+                        TresseSync(vault).saveConfig(cleared)
+                        syncConfig = cleared
+                        syncStore.updateConfig(cleared.storageType, cleared.isComplete(), cleared.autoSyncEnabled)
+                    }
+                },
                 syncState = syncStore.state,
             ),
         )
@@ -233,6 +246,26 @@ private fun DesktopShardkeepApp() {
 private fun ignoredPath(path: String, config: TresseConfig): Boolean =
     path == ".tresse" || path.startsWith(".tresse/") ||
         config.ignorePatterns.any { it.isNotBlank() && (path == it || path.startsWith("$it/")) }
+
+/** Object classes of the local CAS; everything under them is regenerable from a sync. */
+private val STORE_DIRS = listOf(".tresse/meta", ".tresse/content")
+private const val FILE_INDEX = ".tresse/file-index.json"
+
+/**
+ * Drops the replica's local chunk store — both object classes plus the file index —
+ * leaving `.tresse/config.toml` and the notes themselves alone.
+ */
+private fun wipeChunkStore(vault: TresseVault) {
+    for (dir in STORE_DIRS) {
+        runCatching { vault.storeList(dir) }.getOrDefault(emptyList()).forEach { name ->
+            runCatching { vault.storeDelete("$dir/$name") }
+        }
+    }
+    runCatching { vault.storeDelete(FILE_INDEX) }
+}
+
+/** Forgets which repository this replica belonged to, keeping the storage coordinates. */
+private fun TresseConfig.withoutRepository() = copy(repoId = "", encryptionKey = "")
 
 private fun SyncStatusStore.progress() = object : TresseSyncProgress {
     override fun reportCommitRead() = this@progress.reportCommitRead()

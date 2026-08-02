@@ -111,6 +111,10 @@
     <string name="syncing">Syncing…</string>
     <string name="sync_now">Sync now</string>
     <string name="force_pull">Force pull</string>
+    <string name="wipe_chunks">Wipe local chunks</string>
+    <string name="wipe_chunks_hint">Deletes the local Tresse chunk store and clears the repository ID and encryption key. Notes and the remote store are left untouched.</string>
+    <string name="wipe_chunks_confirm">Every locally cached chunk will be deleted and the repository ID and encryption key cleared. Without a backup of the key, versions already stored on the remote cannot be decrypted again.</string>
+    <string name="wipe_chunks_action">Wipe</string>
     <string name="add_workspace">+ Add workspace</string>
     <string name="storage_http">HTTP</string>
     <string name="storage_s3">S3</string>

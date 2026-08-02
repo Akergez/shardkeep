@@ -52,7 +52,11 @@ import com.akergez.shardkeep.sync.ignoredPath
 import com.akergez.shardkeep.sync.summaryOf
 import com.akergez.shardkeep.sync.saveLocalSync
 import com.akergez.shardkeep.sync.withLocalSync
+import com.akergez.shardkeep.sync.wipeChunkStore
+import com.akergez.shardkeep.sync.withoutRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = mutableStateOf<AppDeepLink?>(null)
@@ -307,6 +311,23 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                         )
                         throw error
                     }
+                },
+                onWipeChunks = {
+                    withContext(Dispatchers.IO) {
+                        // The ignore predicate only filters tracked notes, which a
+                        // store-only wipe never touches.
+                        wipeChunkStore(safTresseVault(applicationContext, uri) { false })
+                    }
+                    // The store is gone, so the replica must not keep claiming the
+                    // repository it belonged to; the storage coordinates stay.
+                    val cleared = (TresseConfigFile.read(storage) ?: TresseConfig())
+                        .withLocalSync(preferences)
+                        .withoutRepository()
+                    TresseConfigFile.write(storage, cleared)
+                    preferences.saveLocalSync(cleared)
+                    syncConfig = cleared
+                    pushSyncStatus(syncStatus, cleared)
+                    TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, cleared)
                 },
                 syncState = syncStatus.state,
             ),
