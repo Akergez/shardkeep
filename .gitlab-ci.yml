@@ -114,6 +114,12 @@ build:macos-arm64:
 
 # PowerShell runner. jpackage builds the MSI itself but shells out to WiX v3 for
 # it, and neither WiX nor a JDK is on the image, so both are fetched here.
+#
+# WiX приходит распакованным zip-ом, а не через chocolatey: тамошний пакет
+# `wixtoolset` зависит от `DotNet3.5`, который ставится через
+# `DISM /Enable-Feature NetFx3`, а на образе раннера этой полезной нагрузки нет
+# и брать её неоткуда — установка падает и уносит с собой всю задачу. Готовым
+# `candle.exe`/`light.exe` из архива .NET 3.5 не нужен, jpackage ищет их на PATH.
 build:windows-x86_64:
   stage: build
   tags:
@@ -125,8 +131,10 @@ build:windows-x86_64:
     - $env:JAVA_HOME = (Get-ChildItem "$env:CI_PROJECT_DIR\.jdk" -Directory | Select-Object -First 1).FullName
     - $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
     - java -version
-    - choco install wixtoolset --version 3.14.1 -y --no-progress
-    - $env:PATH = "$env:PATH;${env:ProgramFiles(x86)}\WiX Toolset v3.14\bin"
+    - Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" -OutFile wix.zip
+    - Expand-Archive -Path wix.zip -DestinationPath "$env:CI_PROJECT_DIR\.wix" -Force
+    - $env:PATH = "$env:CI_PROJECT_DIR\.wix;$env:PATH"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\.wix\candle.exe")) { throw "WiX archive layout changed: candle.exe is not at the archive root" }
   script:
     - .\gradlew.bat --no-daemon :desktopApp:packageMsi
   artifacts:
