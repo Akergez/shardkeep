@@ -217,8 +217,16 @@ private fun DesktopShardkeepApp() {
                 onImportSyncConfig = { encoded ->
                     runCatching { TresseConfigString.decode(encoded) }.fold(
                         onSuccess = { decoded ->
+                            // See MainActivity: a config string is credentials only, and
+                            // the fields it omits must come from this replica, not from
+                            // TresseConfig's defaults.
+                            val current = syncConfig ?: TresseConfig()
                             val imported = decoded.copy(
-                                languages = syncConfig?.languages ?: TresseConfig().languages,
+                                languages = current.languages,
+                                ignorePatterns = current.ignorePatterns,
+                                autoSyncEnabled = current.autoSyncEnabled,
+                                autoSyncIntervalMinutes = current.autoSyncIntervalMinutes,
+                                autoSyncDebounceSeconds = current.autoSyncDebounceSeconds,
                             )
                             syncEngine(imported).saveConfig(imported)
                             preferences.saveLocalSync(imported)

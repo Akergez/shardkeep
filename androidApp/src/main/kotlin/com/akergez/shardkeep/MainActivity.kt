@@ -263,8 +263,17 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 onImportSyncConfig = { configString ->
                     runCatching { TresseConfigString.decode(configString) }.fold(
                         onSuccess = { decoded ->
+                            // A config string carries credentials only, so every field it
+                            // omits arrives as a default. Taking those would blank the
+                            // notes directory's ignore rules and reset this device's
+                            // schedule, neither of which the sender was sharing.
+                            val current = syncConfig ?: TresseConfig()
                             val imported = decoded.copy(
-                                languages = syncConfig?.languages ?: TresseConfig().languages,
+                                languages = current.languages,
+                                ignorePatterns = current.ignorePatterns,
+                                autoSyncEnabled = current.autoSyncEnabled,
+                                autoSyncIntervalMinutes = current.autoSyncIntervalMinutes,
+                                autoSyncDebounceSeconds = current.autoSyncDebounceSeconds,
                             )
                             preferences.saveLocalSync(imported)
                             configSync.saveConfig(imported)
