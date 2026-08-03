@@ -48,7 +48,6 @@ import com.akergez.tresse.kmp.safTresseVault
 import com.akergez.shardkeep.sync.TresseSyncScheduler
 import com.akergez.shardkeep.sync.SyncStatusHolder
 import com.akergez.shardkeep.sync.asProgress
-import com.akergez.shardkeep.sync.ignoreFilter
 import com.akergez.shardkeep.sync.summaryOf
 import com.akergez.shardkeep.sync.saveLocalSync
 import com.akergez.shardkeep.sync.withLocalSync
@@ -282,7 +281,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     try {
                         val config = requireNotNull(configSync.loadConfig()) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
-                        val vault = safTresseVault(applicationContext, uri, ignoreFilter(config))
+                        val vault = safTresseVault(applicationContext, uri, config.ignorePatterns)
                         val result = TresseSync(vault).perform(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
@@ -302,7 +301,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     try {
                         val config = requireNotNull(configSync.loadConfig()) { getString(R.string.config_not_found) }
                             .withLocalSync(preferences)
-                        val vault = safTresseVault(applicationContext, uri, ignoreFilter(config))
+                        val vault = safTresseVault(applicationContext, uri, config.ignorePatterns)
                         val result = TresseSync(vault).forcePull(config, syncStatus.asProgress())
                         repository.refresh()
                         quickNoteRepository.refresh()
@@ -319,9 +318,9 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                 },
                 onWipeChunks = {
                     withContext(Dispatchers.IO) {
-                        // The ignore predicate only filters tracked notes, which a
-                        // store-only wipe never touches.
-                        wipeChunkStore(safTresseVault(applicationContext, uri) { false })
+                        // Ignore rules only filter tracked notes, which a store-only
+                        // wipe never touches.
+                        wipeChunkStore(safTresseVault(applicationContext, uri))
                     }
                     // The store is gone, so the replica must not keep claiming the
                     // repository it belonged to; the storage coordinates stay.
