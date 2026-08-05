@@ -120,17 +120,19 @@ build:macos-arm64:
 #
 # Wine берётся из штатного репозитория дистрибутива, а не с dl.winehq.org: пакет
 # оттуда ставится в /opt/wine-stable, куда pinpit и обращается по абсолютному
-# пути, поэтому дистрибутивный /usr/bin/wine доводится симлинками. mono-complete
-# нужен потому, что candle.exe и light.exe из WiX — это .NET.
+# пути, поэтому дистрибутивный /usr/bin/wine доводится симлинками. candle.exe и
+# light.exe из WiX требуют CLR внутри Wine: обычный Linux mono-complete его не
+# предоставляет, поэтому совместимый Wine Mono ставится отдельным MSI ниже.
 #
 # --no-configuration-cache обязателен: pinpit форкнут от Compose plugin 1.2.1 и
 # на configuration cache падает с "property 'jdk' has no value".
 #
-# Джоба дальше клонирования пока не доходила, так что связка wine + WiX здесь
-# проверена только по документации pinpit, а не запуском.
+# Логи Wine и сгенерированные WiX-файлы сохраняются при любом исходе джобы,
+# поскольку candle/light могут упасть до появления MSI.
 build:windows-x86_64:
   stage: build
-  image: eclipse-temurin:21-jdk
+  # Pin the Ubuntu release because Wine and Wine Mono must stay compatible.
+  image: eclipse-temurin:21-jdk-noble
   <<: *tag_rules
   cache:
     key: "$CI_COMMIT_REF_SLUG"
@@ -140,6 +142,8 @@ build:windows-x86_64:
       - .pinpit
     policy: pull-push
   variables:
+    WINE_MONO_VERSION: "9.0.0"
+    XDG_RUNTIME_DIR: "$CI_PROJECT_DIR/.xdg-runtime"
     # Keep Wine's errors and warnings in the job log. The pinpit Gradle task also
     # writes the complete candle/light output under build/pinpit/logs (see artifacts).
     WINEDEBUG: "err,warn"
@@ -151,13 +155,26 @@ build:windows-x86_64:
     # а в HOME на него смотрит симлинк, который ставится уже после клона.
     - mkdir -p "$CI_PROJECT_DIR/.pinpit"
     - ln -sfn "$CI_PROJECT_DIR/.pinpit" "$HOME/.pinpit"
+    - mkdir -p "$XDG_RUNTIME_DIR"
+    - chmod 700 "$XDG_RUNTIME_DIR"
     - dpkg --add-architecture i386
     - apt-get update
-    - apt-get install -y --no-install-recommends wine wine32 wine64 mono-complete
+    - apt-get install -y --no-install-recommends ca-certificates curl wine wine32 wine64
     - mkdir -p /opt/wine-stable/bin
     - ln -sf /usr/bin/wine /opt/wine-stable/bin/wine
     - ln -sf /usr/bin/winepath /opt/wine-stable/bin/winepath
     - ln -sf /usr/bin/wineserver /opt/wine-stable/bin/wineserver
+    # WiX 3.11 is a .NET Framework application. Native Linux Mono does not
+    # provide Wine's CLR, so install the matching Wine Mono package explicitly.
+    - |
+      WINE_MONO_MSI="$CI_PROJECT_DIR/.pinpit/wine-mono-${WINE_MONO_VERSION}-x86.msi"
+      if [ ! -s "$WINE_MONO_MSI" ]; then
+        curl --fail --location --retry 3 \
+          --output "$WINE_MONO_MSI" \
+          "https://dl.winehq.org/wine/wine-mono/${WINE_MONO_VERSION}/wine-mono-${WINE_MONO_VERSION}-x86.msi"
+      fi
+      wine msiexec /i "$WINE_MONO_MSI" /qn
+      wineserver -w
   script:
     - ./gradlew --no-daemon --no-configuration-cache :desktopApp:pinpitPackageDefaultMsiX64
   artifacts:
