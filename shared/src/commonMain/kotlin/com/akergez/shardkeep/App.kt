@@ -92,6 +92,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.akergez.shardkeep.data.InMemoryTaskRepository
 import com.akergez.shardkeep.domain.model.CalendarDate
@@ -110,7 +111,8 @@ import com.akergez.shardkeep.domain.repository.TaskRepository
 import com.akergez.shardkeep.domain.repository.TaskDestination
 import com.akergez.shardkeep.domain.repository.TaskDestinationProvider
 import com.akergez.shardkeep.domain.usecase.ObserveFilteredTasks
-import com.akergez.shardkeep.platform.currentLocalDate
+import com.akergez.shardkeep.platform.hasFinePointer
+import com.akergez.shardkeep.platform.rememberCurrentLocalDate
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -260,7 +262,7 @@ fun App() {
             color = MaterialTheme.colorScheme.background,
             contentColor = MaterialTheme.colorScheme.onBackground,
         ) {
-            val today = remember { currentLocalDate() }
+            val today = rememberCurrentLocalDate()
             val demoConnectNotesDirectory = stringResource(Res.string.demo_connect_notes_directory)
             val demoCheckUi = stringResource(Res.string.demo_check_ui)
             val defaultHeading = stringResource(Res.string.default_tasks_heading)
@@ -394,6 +396,111 @@ private fun AppNavigationRail(
     }
 }
 
+/**
+ * Which of Material 3's navigation containers a given window width calls for.
+ *
+ * The breakpoints are M3's window size classes. A collapsed rail is specified for medium and
+ * expanded windows; once a window reaches the large class there is room to spell the
+ * destinations out, and the rail expands — the same items with the label beside the icon
+ * rather than stacked under it. Stacked labels are a phone and tablet convention, and a
+ * desktop window sits well past the width where they still read as intentional.
+ *
+ * The expanded rail is the narrow end of what M3 offers here: 220dp against the 360dp of a
+ * permanent drawer, which is the other container specified for this width. Rows stay 56dp
+ * either way — that is the spec's own metric, not a default left unconsidered.
+ */
+private enum class AppNavigation { Bar, Rail, Sidebar }
+
+/** Start of M3's medium window size class: below this a window is compact. */
+private val MediumWindowWidth = 600.dp
+
+/** Start of M3's large window size class, where the rail gives way to a permanent drawer. */
+private val LargeWindowWidth = 1200.dp
+
+private fun navigationFor(width: Dp, finePointer: Boolean): AppNavigation = when {
+    width < MediumWindowWidth -> AppNavigation.Bar
+    width < LargeWindowWidth -> AppNavigation.Rail
+    // A large tablet in landscape is as wide as a laptop, so width alone would hand it the
+    // sidebar — whose rows are sized for a cursor and sit under the touch target a finger
+    // needs. Touch keeps the rail, which is both M3's answer and what these devices had.
+    finePointer -> AppNavigation.Sidebar
+    else -> AppNavigation.Rail
+}
+
+private val SidebarWidth = 200.dp
+private val SidebarRowHeight = 34.dp
+private val SidebarIconSize = 18.dp
+
+/**
+ * The wide navigation area, built here rather than taken from Material 3.
+ *
+ * M3's expanded rail was the obvious candidate and it does not survive contact with a mouse.
+ * Its metrics are finger-sized — a 56dp row against this list's 34dp — and the parts that
+ * make it look wrong are not defaults but the spec: items sit flush against each other, since
+ * the expanded rail sets its vertical spacing to zero, and their content is centred inside the
+ * indicator, so icons land at a different offset on every row depending on how long the label
+ * is. Neither is reachable through a parameter, and the container forces a 48dp floor on any
+ * child, so a smaller row cannot be passed in either.
+ *
+ * What is kept is M3's colour semantics: the selected row uses the secondary container that
+ * the rail's own active indicator uses, and the rest read as `onSurfaceVariant`. So the theme
+ * still drives this — only the measurements are the desktop's rather than the phone's.
+ */
+@Composable
+private fun AppSidebar(
+    section: AppSection,
+    showNotes: Boolean,
+    onSectionChange: (AppSection) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxHeight().width(SidebarWidth),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            AppNavigationDestinations(
+                showNotes = showNotes,
+                item = { destination, icon, label ->
+                    val selected = section == destination
+                    val content = if (selected) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(SidebarRowHeight)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.secondaryContainer
+                                else Color.Transparent
+                            )
+                            .clickable { onSectionChange(destination) }
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(icon),
+                            contentDescription = null,
+                            modifier = Modifier.size(SidebarIconSize),
+                            tint = content,
+                        )
+                        Text(
+                            text = stringResource(label),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = content,
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun AppNavigationDestinations(
     showNotes: Boolean,
@@ -517,17 +624,31 @@ fun ShardkeepApp(
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val useNavigationRail = maxWidth > maxHeight
+        // Width alone decides, as M3 specifies. Keying this off the aspect ratio, as it once
+        // was, asks the wrong question: a tall narrow desktop window is landscape-negative yet
+        // has no room for a rail, and a phone held sideways is landscape yet has no room either.
+        val navigation = navigationFor(maxWidth, hasFinePointer())
         Row(modifier = Modifier.fillMaxSize()) {
-            if (useNavigationRail) {
-                AppNavigationRail(
+            when (navigation) {
+                AppNavigation.Sidebar -> AppSidebar(
                     section = section,
                     showNotes = quickNoteRepository != null,
                     onSectionChange = { section = it },
                 )
+                AppNavigation.Rail -> AppNavigationRail(
+                    section = section,
+                    showNotes = quickNoteRepository != null,
+                    onSectionChange = { section = it },
+                )
+                AppNavigation.Bar -> Unit
             }
             Scaffold(
                 modifier = Modifier.weight(1f),
+                // Scaffold defaults to `background`, which the native palette maps to the
+                // colour behind a window rather than under a list. Elsewhere the two roles
+                // agree; on macOS `background` is Aqua's grey window fill and `surface` the
+                // white a list is supposed to sit on.
+                containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = {
@@ -617,7 +738,7 @@ fun ShardkeepApp(
             }
         },
         bottomBar = {
-            if (!useNavigationRail) {
+            if (navigation == AppNavigation.Bar) {
                 AppNavigationBar(
                     section = section,
                     showNotes = quickNoteRepository != null,
@@ -1799,6 +1920,7 @@ private fun NoteEditorScreen(
         if (isChecklist) items.any { it.text.isNotBlank() } else content.isNotBlank()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 navigationIcon = {

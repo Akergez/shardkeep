@@ -112,34 +112,48 @@ build:macos-arm64:
       - desktopApp/build/compose/binaries/main/dmg/*.dmg
     expire_in: 1 week
 
-# PowerShell runner. jpackage builds the MSI itself but shells out to WiX v3 for
-# it, and neither WiX nor a JDK is on the image, so both are fetched here.
+# Windows-инсталлятор собирается здесь же, на Linux, чтобы не платить за
+# windows-раннер. Пакует его pinpit, а не jpackage: jpackage кросс-компиляцию
+# объявил non-goal и работает только на целевой ОС. pinpit скачивает Windows JDK
+# сам, собирает из него рантайм через jlink (jlink кросс-платформенный), а WiX
+# гоняет под Wine.
 #
-# WiX приходит распакованным zip-ом, а не через chocolatey: тамошний пакет
-# `wixtoolset` зависит от `DotNet3.5`, который ставится через
-# `DISM /Enable-Feature NetFx3`, а на образе раннера этой полезной нагрузки нет
-# и брать её неоткуда — установка падает и уносит с собой всю задачу. Готовым
-# `candle.exe`/`light.exe` из архива .NET 3.5 не нужен, jpackage ищет их на PATH.
+# Wine берётся из штатного репозитория дистрибутива, а не с dl.winehq.org: пакет
+# оттуда ставится в /opt/wine-stable, куда pinpit и обращается по абсолютному
+# пути, поэтому дистрибутивный /usr/bin/wine доводится симлинками. mono-complete
+# нужен потому, что candle.exe и light.exe из WiX — это .NET.
+#
+# --no-configuration-cache обязателен: pinpit форкнут от Compose plugin 1.2.1 и
+# на configuration cache падает с "property 'jdk' has no value".
 build:windows-x86_64:
   stage: build
-  tags:
-    - saas-windows-medium-amd64
-  <<: [*gradle_cache, *tag_rules]
+  image: eclipse-temurin:21-jdk
+  <<: *tag_rules
+  # pinpit держит скачанный Windows JDK в $HOME/.pinpit, а закэшировать GitLab
+  # умеет только пути внутри проекта — отсюда подменённый HOME.
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .gradle/caches
+      - .gradle/wrapper
+      - .pinpit
+    policy: pull-push
+  variables:
+    WINEDEBUG: "-all"
+    HOME: "$CI_PROJECT_DIR"
   before_script:
-    - Invoke-WebRequest -Uri "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip" -OutFile jdk.zip
-    - Expand-Archive -Path jdk.zip -DestinationPath "$env:CI_PROJECT_DIR\.jdk" -Force
-    - $env:JAVA_HOME = (Get-ChildItem "$env:CI_PROJECT_DIR\.jdk" -Directory | Select-Object -First 1).FullName
-    - $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
-    - java -version
-    - Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" -OutFile wix.zip
-    - Expand-Archive -Path wix.zip -DestinationPath "$env:CI_PROJECT_DIR\.wix" -Force
-    - $env:PATH = "$env:CI_PROJECT_DIR\.wix;$env:PATH"
-    - 'if (-not (Test-Path "$env:CI_PROJECT_DIR\.wix\candle.exe")) { throw "candle.exe is not at the WiX archive root" }'
+    - dpkg --add-architecture i386
+    - apt-get update
+    - apt-get install -y --no-install-recommends wine wine32 wine64 mono-complete
+    - mkdir -p /opt/wine-stable/bin
+    - ln -sf /usr/bin/wine /opt/wine-stable/bin/wine
+    - ln -sf /usr/bin/winepath /opt/wine-stable/bin/winepath
+    - ln -sf /usr/bin/wineserver /opt/wine-stable/bin/wineserver
   script:
-    - .\gradlew.bat --no-daemon :desktopApp:packageMsi
+    - ./gradlew --no-daemon --no-configuration-cache :desktopApp:pinpitPackageDefaultMsiX64
   artifacts:
     paths:
-      - desktopApp/build/compose/binaries/main/msi/*.msi
+      - desktopApp/build/pinpit/binaries/main-default/windows/x64/msi/*.msi
     expire_in: 1 week
 
 package:publish:
@@ -176,7 +190,7 @@ package:publish:
       test -n "$DMG"
       curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$DMG" "${PACKAGE_URL}/Shardkeep-${CI_COMMIT_TAG}-macOS-arm64.dmg"
     - |
-      MSI=$(find desktopApp/build/compose/binaries/main/msi -name '*.msi' -type f -print -quit)
+      MSI=$(find desktopApp/build/pinpit/binaries/main-default/windows/x64/msi -name '*.msi' -type f -print -quit)
       test -n "$MSI"
       curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$MSI" "${PACKAGE_URL}/Shardkeep-${CI_COMMIT_TAG}-windows-x86_64.msi"
   <<: *tag_rules

@@ -34,6 +34,12 @@ dependencyResolutionManagement {
                 .orElse("https://gitlab.com/api/v4/projects/84164267/packages/maven").get())
             content { includeGroup("com.akergez.tresse") }
         }
+        maven {
+            name = "NativeColorsGitLab"
+            url = uri(providers.environmentVariable("NATIVE_COLORS_MAVEN_URL")
+                .orElse("https://gitlab.com/api/v4/projects/85136341/packages/maven").get())
+            content { includeGroup("com.akergez.nativecolors") }
+        }
     }
 }
 

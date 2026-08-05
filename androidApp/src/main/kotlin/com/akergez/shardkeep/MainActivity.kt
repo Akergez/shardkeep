@@ -32,7 +32,7 @@ import com.akergez.shardkeep.db.DatabaseDriverFactory
 import com.akergez.shardkeep.db.createDatabase
 import com.akergez.shardkeep.domain.model.QuickNote
 import com.akergez.shardkeep.domain.model.TaskFormat
-import com.akergez.shardkeep.platform.currentLocalDate
+import com.akergez.shardkeep.platform.rememberCurrentLocalDate
 import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
 import com.akergez.shardkeep.notifications.NotificationScheduler
 import com.akergez.shardkeep.widget.ChecklistWidget
@@ -177,7 +177,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
     }
     var loadError by remember(repository) { mutableStateOf(false) }
     var refreshKey by remember(repository) { mutableStateOf(0) }
-    val today = remember { currentLocalDate() }
+    val today = rememberCurrentLocalDate()
 
     LaunchedEffect(storage, refreshKey) {
         // Нет файла — заводим его с образцами приложения. Иначе синк пошёл бы по

@@ -11,7 +11,7 @@ import androidx.compose.ui.window.application
 import com.akergez.shardkeep.data.NotesDirectoryQuickNoteRepository
 import com.akergez.shardkeep.data.NotesDirectoryTaskRepository
 import com.akergez.shardkeep.domain.model.TaskFormat
-import com.akergez.shardkeep.platform.currentLocalDate
+import com.akergez.shardkeep.platform.rememberCurrentLocalDate
 import shardkeep.shared.generated.resources.Res
 import shardkeep.shared.generated.resources.*
 import com.akergez.tresse.kmp.TresseConfig
@@ -63,7 +63,7 @@ private fun configureMacOsApplication() {
 
 @Composable
 private fun DesktopShardkeepApp() {
-    DesktopMacOsTheme {
+    ShardkeepTheme {
         val defaultWorkspaceName = stringResource(Res.string.workspace_default)
         val selectDirectoryTitle = stringResource(Res.string.select_notes_directory)
         val syncNotConfiguredError = stringResource(Res.string.sync_not_configured_error)
@@ -89,7 +89,7 @@ private fun DesktopShardkeepApp() {
                     activeWorkspaceId = added.id
                 }
             })
-            return@DesktopMacOsTheme
+            return@ShardkeepTheme
         }
         if (format == null) {
             FormatSetupScreen(onFormatSelected = { selectedFormat ->
@@ -98,7 +98,7 @@ private fun DesktopShardkeepApp() {
                 }
                 saveDesktopWorkspaces(registryPreferences, workspaces, activeWorkspace!!.id)
             })
-            return@DesktopMacOsTheme
+            return@ShardkeepTheme
         }
 
         val preferences = remember(activeWorkspace!!.id) { registryPreferences.node("workspace_${activeWorkspace.id}") }
@@ -181,7 +181,7 @@ private fun DesktopShardkeepApp() {
         ShardkeepApp(
             repository = taskRepository,
             quickNoteRepository = quickNoteRepository,
-            today = currentLocalDate(),
+            today = rememberCurrentLocalDate(),
             workspaceName = activeWorkspace.name,
             workspaces = workspaces.map { WorkspaceOption(it.id, it.name) },
             onWorkspaceSelected = { id ->

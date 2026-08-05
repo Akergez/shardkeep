@@ -25,6 +25,7 @@ tasks.withType<KotlinCompile>().configureEach {
 dependencies {
     implementation(projects.shared)
     implementation(libs.tresse.kmp)
+    implementation(libs.native.colors)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodelCompose)
