@@ -140,7 +140,9 @@ build:windows-x86_64:
       - .pinpit
     policy: pull-push
   variables:
-    WINEDEBUG: "-all"
+    # Keep Wine's errors and warnings in the job log. The pinpit Gradle task also
+    # writes the complete candle/light output under build/pinpit/logs (see artifacts).
+    WINEDEBUG: "err,warn"
   before_script:
     # pinpit держит скачанный Windows JDK в ~/.pinpit, а кэшировать GitLab умеет
     # только пути внутри проекта. Подменять ради этого HOME нельзя: переменные
@@ -161,6 +163,11 @@ build:windows-x86_64:
   artifacts:
     paths:
       - desktopApp/build/pinpit/binaries/main-default/windows/x64/msi/*.msi
+      - desktopApp/build/pinpit/logs/**/*
+      - desktopApp/build/pinpit/tmp/**/wix/*.wxs
+    # candle.exe failures happen before an MSI exists, so diagnostics must be
+    # uploaded for failed jobs as well.
+    when: always
     expire_in: 1 week
 
 package:publish:
