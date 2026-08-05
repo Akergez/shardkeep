@@ -73,6 +73,10 @@ pinpit.desktop {
             packageName = "Shardkeep"
             packageVersion = applicationVersion.get()
             vendor = "Akergez"
+            // Обязательны именно у pinpit: в Compose plugin те же свойства опциональные,
+            // а форк требует их значений на этапе конфигурации задачи.
+            description = "Shardkeep"
+            copyright = "© Akergez"
 
             windows {
                 dirChooser = true
