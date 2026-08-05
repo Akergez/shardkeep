@@ -125,12 +125,13 @@ build:macos-arm64:
 #
 # --no-configuration-cache обязателен: pinpit форкнут от Compose plugin 1.2.1 и
 # на configuration cache падает с "property 'jdk' has no value".
+#
+# Джоба дальше клонирования пока не доходила, так что связка wine + WiX здесь
+# проверена только по документации pinpit, а не запуском.
 build:windows-x86_64:
   stage: build
   image: eclipse-temurin:21-jdk
   <<: *tag_rules
-  # pinpit держит скачанный Windows JDK в $HOME/.pinpit, а закэшировать GitLab
-  # умеет только пути внутри проекта — отсюда подменённый HOME.
   cache:
     key: "$CI_COMMIT_REF_SLUG"
     paths:
@@ -140,8 +141,14 @@ build:windows-x86_64:
     policy: pull-push
   variables:
     WINEDEBUG: "-all"
-    HOME: "$CI_PROJECT_DIR"
   before_script:
+    # pinpit держит скачанный Windows JDK в ~/.pinpit, а кэшировать GitLab умеет
+    # только пути внутри проекта. Подменять ради этого HOME нельзя: переменные
+    # job'а раннер экспортирует до клонирования, и git падает, пытаясь создать
+    # .gitconfig в ещё не существующем каталоге. Поэтому каталог лежит в проекте,
+    # а в HOME на него смотрит симлинк, который ставится уже после клона.
+    - mkdir -p "$CI_PROJECT_DIR/.pinpit"
+    - ln -sfn "$CI_PROJECT_DIR/.pinpit" "$HOME/.pinpit"
     - dpkg --add-architecture i386
     - apt-get update
     - apt-get install -y --no-install-recommends wine wine32 wine64 mono-complete
