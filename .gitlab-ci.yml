@@ -71,9 +71,10 @@ build:linux-arm64:
   stage: build
   image: eclipse-temurin:21-jdk
   tags:
-    - saas-linux-small-arm64
+    - linux-arm64
   <<: [*gradle_cache, *tag_rules]
   before_script:
+    - test "$(uname -m)" = "aarch64"
     - apt-get update && apt-get install -y rpm
   script:
     - ./gradlew --no-daemon :desktopApp:packageRpm
