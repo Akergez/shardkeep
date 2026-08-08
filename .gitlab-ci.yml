@@ -64,7 +64,7 @@ build:linux-x86_64:
     - apt-get update && apt-get install -y rpm
   script:
     - ./gradlew --no-daemon :desktopApp:packageRpm
-    - rpm -qpl desktopApp/build/compose/binaries/main/rpm/*.rpm | grep -E '^/usr/share/applications/.+\.desktop$'
+    - rpm -qpl desktopApp/build/compose/binaries/main/rpm/*.rpm | grep -E '/[^/]+\.desktop$'
   artifacts:
     paths:
       - desktopApp/build/compose/binaries/main/rpm/*.rpm
@@ -88,7 +88,7 @@ build:linux-arm64:
       -Dorg.gradle.jvmargs="-Xmx1024m -Dfile.encoding=UTF-8"
       -Pkotlin.compiler.execution.strategy=in-process
       :desktopApp:packageRpm
-    - rpm -qpl desktopApp/build/compose/binaries/main/rpm/*.rpm | grep -E '^/usr/share/applications/.+\.desktop$'
+    - rpm -qpl desktopApp/build/compose/binaries/main/rpm/*.rpm | grep -E '/[^/]+\.desktop$'
   artifacts:
     paths:
       - desktopApp/build/compose/binaries/main/rpm/*.rpm
