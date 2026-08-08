@@ -57,11 +57,14 @@ build:android:
 build:linux-x86_64:
   stage: build
   image: eclipse-temurin:21-jdk
+  tags:
+    - linux-x86
   <<: [*gradle_cache, *tag_rules]
   before_script:
     - apt-get update && apt-get install -y rpm
   script:
     - ./gradlew --no-daemon :desktopApp:packageRpm
+    - rpm -ql desktopApp/build/compose/binaries/main/rpm/*.rpm | grep -E '^/usr/share/applications/.+\.desktop$'
   artifacts:
     paths:
       - desktopApp/build/compose/binaries/main/rpm/*.rpm
@@ -77,7 +80,15 @@ build:linux-arm64:
     - test "$(uname -m)" = "aarch64"
     - apt-get update && apt-get install -y rpm
   script:
-    - ./gradlew --no-daemon :desktopApp:packageRpm
+    - >-
+      ./gradlew
+      --no-daemon
+      --no-configuration-cache
+      --max-workers=1
+      -Dorg.gradle.jvmargs="-Xmx1024m -Dfile.encoding=UTF-8"
+      -Pkotlin.compiler.execution.strategy=in-process
+      :desktopApp:packageRpm
+    - rpm -ql desktopApp/build/compose/binaries/main/rpm/*.rpm | grep -E '^/usr/share/applications/.+\.desktop$'
   artifacts:
     paths:
       - desktopApp/build/compose/binaries/main/rpm/*.rpm

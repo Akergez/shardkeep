@@ -111,6 +111,7 @@ compose.desktop {
             packageVersion = applicationVersion.get()
             linux {
                 iconFile.set(project.file("icons/icon.png"))
+                shortcut = true
             }
             macOS {
                 iconFile.set(project.file("icons/icon.icns"))
