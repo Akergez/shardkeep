@@ -205,6 +205,7 @@ private fun DesktopShardkeepApp() {
                 notificationsEnabled = false,
                 onNotificationsEnabledChange = {},
                 syncConfig = (syncConfig ?: TresseConfig(autoSyncEnabled = false)).toDraft(),
+                syncConfigured = syncConfig?.isComplete() == true,
                 onSyncConfigChange = { draft ->
                     val config = draft.toConfig(
                         syncConfig?.languages ?: TresseConfig().languages,

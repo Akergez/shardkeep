@@ -60,6 +60,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
@@ -88,9 +89,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -130,6 +136,7 @@ import shardkeep.shared.generated.resources.ic_event
 import shardkeep.shared.generated.resources.ic_event_available
 import shardkeep.shared.generated.resources.ic_format_list
 import shardkeep.shared.generated.resources.ic_schedule
+import shardkeep.shared.generated.resources.ic_refresh
 import shardkeep.shared.generated.resources.all_tasks
 import shardkeep.shared.generated.resources.app_name
 import shardkeep.shared.generated.resources.cancel
@@ -330,6 +337,7 @@ data class SettingsCallbacks(
     val notificationsEnabled: Boolean,
     val onNotificationsEnabledChange: (Boolean) -> Unit,
     val syncConfig: SyncConfigDraft? = null,
+    val syncConfigured: Boolean = false,
     val onSyncConfigChange: suspend (SyncConfigDraft) -> Unit = { },
     val onImportSyncConfig: suspend (String) -> Boolean = { false },
     /** Runs a sync and returns a short human-readable summary; throws on failure. */
@@ -571,6 +579,23 @@ fun ShardkeepApp(
     val noteDeleteErrorMessage = stringResource(Res.string.note_delete_error)
     val noteUpdateErrorMessage = stringResource(Res.string.note_update_error)
 
+    fun refresh() {
+        if (refreshing) return
+        scope.launch {
+            refreshing = true
+            runCatching {
+                if (settingsCallbacks?.syncConfigured == true) {
+                    settingsCallbacks.onSync?.invoke()
+                }
+                repository.refresh()
+                quickNoteRepository?.refresh()
+            }
+                .onSuccess { snackbarHostState.showSnackbar(refreshCompleteMessage) }
+                .onFailure { snackbarHostState.showSnackbar(refreshErrorMessage) }
+            refreshing = false
+        }
+    }
+
     LaunchedEffect(deepLink) {
         when (val target = deepLink) {
             null -> return@LaunchedEffect
@@ -687,54 +712,56 @@ fun ShardkeepApp(
                         }
                     }
                 },
-                actions = {
-                    TextButton(
-                        enabled = !refreshing,
-                        onClick = {
-                            scope.launch {
-                                refreshing = true
-                                runCatching {
-                                    repository.refresh()
-                                    quickNoteRepository?.refresh()
-                                }
-                                    .onSuccess { snackbarHostState.showSnackbar(refreshCompleteMessage) }
-                                    .onFailure { snackbarHostState.showSnackbar(refreshErrorMessage) }
-                                refreshing = false
-                            }
-                        },
-                    ) { Text(stringResource(Res.string.refresh)) }
-                },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            when (section) {
-                AppSection.Tasks -> FloatingActionButton(onClick = { showCreateDialog = true }) {
-                    Icon(
-                        painter = painterResource(Res.drawable.ic_add),
-                        contentDescription = stringResource(Res.string.new_task),
-                    )
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SmallFloatingActionButton(onClick = ::refresh) {
+                    if (refreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_refresh),
+                            contentDescription = stringResource(Res.string.refresh),
+                        )
+                    }
                 }
-                AppSection.AllTasks -> focusedAllTasksPath?.let { path ->
-                    FloatingActionButton(onClick = {
-                        createTaskPathOverride = path
-                        showCreateDialog = true
-                    }) {
+
+                when (section) {
+                    AppSection.Tasks -> FloatingActionButton(onClick = { showCreateDialog = true }) {
                         Icon(
                             painter = painterResource(Res.drawable.ic_add),
                             contentDescription = stringResource(Res.string.new_task),
                         )
                     }
-                }
-                AppSection.Notes -> if (quickNoteRepository != null) {
-                    FloatingActionButton(onClick = { showNoteTypePicker = true }) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_add),
-                            contentDescription = stringResource(Res.string.new_note),
-                        )
+                    AppSection.AllTasks -> focusedAllTasksPath?.let { path ->
+                        FloatingActionButton(onClick = {
+                            createTaskPathOverride = path
+                            showCreateDialog = true
+                        }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_add),
+                                contentDescription = stringResource(Res.string.new_task),
+                            )
+                        }
                     }
+                    AppSection.Notes -> if (quickNoteRepository != null) {
+                        FloatingActionButton(onClick = { showNoteTypePicker = true }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_add),
+                                contentDescription = stringResource(Res.string.new_note),
+                            )
+                        }
+                    }
+                    AppSection.Settings -> Unit
                 }
-                AppSection.Settings -> {}
             }
         },
         bottomBar = {
@@ -1134,15 +1161,7 @@ private fun AllTaskRow(
         )
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = task.title,
-                style = MaterialTheme.typography.bodyLarge,
-                textDecoration = if (task.status == TaskStatus.Done) {
-                    TextDecoration.LineThrough
-                } else {
-                    TextDecoration.None
-                },
-            )
+            TaskTitle(task)
             TaskAttributes(task = task, showLocation = false)
         }
         if (task.scheduledDate != today && task.status != TaskStatus.Done) {
@@ -2188,15 +2207,7 @@ private fun TaskRow(
         )
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = task.title,
-                style = MaterialTheme.typography.bodyLarge,
-                textDecoration = if (task.status == TaskStatus.Done) {
-                    TextDecoration.LineThrough
-                } else {
-                    TextDecoration.None
-                },
-            )
+            TaskTitle(task)
             TaskAttributes(task = task, showLocation = true)
         }
         IconButton(onClick = onEdit) {
@@ -2207,6 +2218,79 @@ private fun TaskRow(
         }
     }
 }
+
+@Composable
+private fun TaskTitle(task: Task) {
+    val linkColor = MaterialTheme.colorScheme.primary
+    val done = task.status == TaskStatus.Done
+    val linkDecoration = if (done) {
+        TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))
+    } else {
+        TextDecoration.Underline
+    }
+    val text = remember(task.title, linkColor, linkDecoration) {
+        buildAnnotatedString {
+            parseTaskTitleLinks(task.title).forEach { segment ->
+                val url = segment.url
+                if (url == null) {
+                    append(segment.text)
+                } else {
+                    withLink(
+                        LinkAnnotation.Url(
+                            url = url,
+                            styles = TextLinkStyles(
+                                style = SpanStyle(
+                                    color = linkColor,
+                                    textDecoration = linkDecoration,
+                                ),
+                            ),
+                        ),
+                    ) {
+                        append(segment.text)
+                    }
+                }
+            }
+        }
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyLarge,
+        textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+    )
+}
+
+internal data class TaskTitleSegment(val text: String, val url: String? = null)
+
+internal fun parseTaskTitleLinks(title: String): List<TaskTitleSegment> {
+    val segments = mutableListOf<TaskTitleSegment>()
+    var cursor = 0
+    TASK_TITLE_LINK_REGEX.findAll(title).forEach { match ->
+        if (match.range.first > cursor) {
+            segments += TaskTitleSegment(title.substring(cursor, match.range.first))
+        }
+
+        val markdownLabel = match.groups[1]?.value
+        val markdownUrl = match.groups[2]?.value
+        if (markdownLabel != null && markdownUrl != null) {
+            segments += TaskTitleSegment(markdownLabel, markdownUrl)
+        } else {
+            val rawUrl = checkNotNull(match.groups[3]?.value)
+            val url = rawUrl.trimEnd('.', ',', ';', ':', '!', '?')
+            segments += TaskTitleSegment(url, url)
+            if (url.length < rawUrl.length) {
+                segments += TaskTitleSegment(rawUrl.substring(url.length))
+            }
+        }
+        cursor = match.range.last + 1
+    }
+    if (cursor < title.length) segments += TaskTitleSegment(title.substring(cursor))
+    return segments.ifEmpty { listOf(TaskTitleSegment(title)) }
+}
+
+private val TASK_TITLE_LINK_REGEX = Regex(
+    pattern = """\[([^\]\n]+)]\((https?://[^\s)]+)\)|(https?://[^\s<]+)""",
+    option = RegexOption.IGNORE_CASE,
+)
 
 @Composable
 private fun EmptyTasks(modifier: Modifier = Modifier) {

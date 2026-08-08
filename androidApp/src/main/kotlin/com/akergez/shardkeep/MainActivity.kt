@@ -250,6 +250,7 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     else NotificationScheduler.cancel(applicationContext, activeWorkspace.id)
                 },
                 syncConfig = syncConfig?.toDraft(),
+                syncConfigured = syncConfig?.isComplete() == true,
                 onSyncConfigChange = { draft ->
                     val updated = draft.toTresseConfig(
                         syncConfig?.languages ?: TresseConfig().languages,
