@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -136,6 +138,7 @@ import shardkeep.shared.generated.resources.ic_event
 import shardkeep.shared.generated.resources.ic_event_available
 import shardkeep.shared.generated.resources.ic_format_list
 import shardkeep.shared.generated.resources.ic_schedule
+import shardkeep.shared.generated.resources.ic_tag
 import shardkeep.shared.generated.resources.ic_refresh
 import shardkeep.shared.generated.resources.all_tasks
 import shardkeep.shared.generated.resources.app_name
@@ -2113,18 +2116,21 @@ private fun TaskChip(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TaskAttributes(
     task: Task,
     showLocation: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val hasContent = task.scheduledDate != null || task.dueDate != null || showLocation
+    val tags = remember(task.title) { parseTaskTitleTags(task.title).tags }
+    val hasContent = task.scheduledDate != null || task.dueDate != null || tags.isNotEmpty() || showLocation
     if (!hasContent) return
 
-    Row(
+    FlowRow(
         modifier = modifier.padding(top = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         task.scheduledDate?.let { date ->
             TaskChip(
@@ -2140,6 +2146,14 @@ private fun TaskAttributes(
                 label = date.toString(),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+        tags.forEach { tag ->
+            TaskChip(
+                painter = painterResource(Res.drawable.ic_tag),
+                label = tag,
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
             )
         }
         if (showLocation) {
@@ -2228,9 +2242,11 @@ private fun TaskTitle(task: Task) {
     } else {
         TextDecoration.Underline
     }
-    val text = remember(task.title, linkColor, linkDecoration) {
+    val title = remember(task.title) { parseTaskTitleTags(task.title).text }
+    if (title.isEmpty()) return
+    val text = remember(title, linkColor, linkDecoration) {
         buildAnnotatedString {
-            parseTaskTitleLinks(task.title).forEach { segment ->
+            parseTaskTitleLinks(title).forEach { segment ->
                 val url = segment.url
                 if (url == null) {
                     append(segment.text)
@@ -2258,6 +2274,48 @@ private fun TaskTitle(task: Task) {
         textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
     )
 }
+
+internal data class TaskTitleContent(val text: String, val tags: List<String>)
+
+/**
+ * Splits inline `#tags` out of a task title so they can be shown as chips instead of raw text.
+ * A `#` only opens a tag at a whitespace boundary, which keeps URL fragments intact, and a
+ * digits-only run is not a tag — the same rules Obsidian uses.
+ */
+internal fun parseTaskTitleTags(title: String): TaskTitleContent {
+    if (!title.contains('#')) return TaskTitleContent(title, emptyList())
+
+    val tags = mutableListOf<String>()
+    val text = StringBuilder()
+    var cursor = 0
+    while (cursor < title.length) {
+        val char = title[cursor]
+        if (char == '#' && (cursor == 0 || title[cursor - 1].isWhitespace())) {
+            var end = cursor + 1
+            while (end < title.length && title[end].isTaskTagChar()) end++
+            val tag = title.substring(cursor + 1, end)
+            if (tag.isNotEmpty() && tag.any { !it.isDigit() }) {
+                tags += tag
+                // Drop the space that separated the tag so punctuation stays attached to the text.
+                if (text.isNotEmpty() && text.last().isWhitespace()) text.deleteAt(text.length - 1)
+                cursor = end
+                continue
+            }
+        }
+        text.append(char)
+        cursor++
+    }
+
+    if (tags.isEmpty()) return TaskTitleContent(title, emptyList())
+    return TaskTitleContent(
+        text = text.toString().trim().replace(WHITESPACE_RUN_REGEX, " "),
+        tags = tags.distinct(),
+    )
+}
+
+private fun Char.isTaskTagChar(): Boolean = isLetterOrDigit() || this == '_' || this == '-' || this == '/'
+
+private val WHITESPACE_RUN_REGEX = Regex("\\s{2,}")
 
 internal data class TaskTitleSegment(val text: String, val url: String? = null)
 
