@@ -28,4 +28,9 @@
     <string name="workspace_numbered">Воркспейс %1$d</string>
     <string name="sync_already_up_to_date">Уже актуально</string>
     <string name="sync_result_summary">Отправлено %1$d, получено %2$d</string>
+    <string name="calendar_display_name">Shardkeep</string>
+    <string name="calendar_sync_summary">Добавлено %1$d, обновлено %2$d, удалено %3$d</string>
+    <string name="calendar_sync_unchanged">Календарь актуален</string>
+    <string name="calendar_export_saved">Выгружено событий: %1$d</string>
+    <string name="calendar_permission_required">Нужен доступ к календарю</string>
 </resources>

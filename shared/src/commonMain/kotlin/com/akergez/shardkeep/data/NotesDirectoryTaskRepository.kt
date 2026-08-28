@@ -8,6 +8,7 @@ import com.akergez.shardkeep.domain.model.TaskFormat
 import com.akergez.shardkeep.domain.model.TaskId
 import com.akergez.shardkeep.domain.model.TaskPriority
 import com.akergez.shardkeep.domain.model.TaskStatus
+import com.akergez.shardkeep.domain.model.TaskTimeSpan
 import com.akergez.shardkeep.domain.repository.TaskRepository
 import com.akergez.shardkeep.domain.repository.TaskDestination
 import com.akergez.shardkeep.domain.repository.TaskDestinationProvider
@@ -202,6 +203,11 @@ class NotesDirectoryTaskRepository(
         refresh()
     }
 
+    /**
+     * Порядок полей повторяет тот, в котором их пишет сам плагин Tasks: приоритет,
+     * повторение, затем даты от начала к концу. Свои 🏁 и ⏰ встают рядом с 🛫,
+     * к которому относятся, а ⏳ и 📅 остаются в хвосте, как и были.
+     */
     private fun buildTaskLine(task: Task): String = buildString {
         append("- [")
         append(if (task.status == TaskStatus.Done) 'x' else ' ')
@@ -210,10 +216,18 @@ class NotesDirectoryTaskRepository(
         when (format) {
             TaskFormat.Emoji -> {
                 if (task.priority != TaskPriority.Normal) append(" ").append(task.priority.emoji)
+                task.recurrence?.let { append(" 🔁 ").append(it) }
+                task.startDate?.let { append(" 🛫 ").append(it) }
+                task.endDate?.let { append(" 🏁 ").append(it) }
+                task.time?.let { append(" ⏰ ").append(it) }
                 task.scheduledDate?.let { append(" ⏳ ").append(it) }
                 task.dueDate?.let { append(" 📅 ").append(it) }
             }
             TaskFormat.Dataview -> {
+                task.recurrence?.let { append(" [repeat:: ").append(it).append("]") }
+                task.startDate?.let { append(" [start:: ").append(it).append("]") }
+                task.endDate?.let { append(" [end:: ").append(it).append("]") }
+                task.time?.let { append(" [time:: ").append(it).append("]") }
                 task.scheduledDate?.let { append(" [scheduled:: ").append(it).append("]") }
                 task.dueDate?.let { append(" [due:: ").append(it).append("]") }
                 if (task.priority != TaskPriority.Normal) {
@@ -238,6 +252,10 @@ class NotesDirectoryTaskRepository(
                         status = if (t.status == "Done") TaskStatus.Done else TaskStatus.Todo,
                         dueDate = t.due_date?.toCalendarDate(),
                         scheduledDate = t.scheduled_date?.toCalendarDate(),
+                        startDate = t.start_date?.toCalendarDate(),
+                        endDate = t.end_date?.toCalendarDate(),
+                        time = t.time_span?.let { span -> TaskTimeSpan.parse(span) },
+                        recurrence = t.recurrence,
                         priority = runCatching { TaskPriority.valueOf(t.priority) }.getOrDefault(TaskPriority.Normal),
                         location = NotesDirectoryLocation(
                             path = t.file_path,
@@ -281,6 +299,10 @@ class NotesDirectoryTaskRepository(
                         status = task.status.name,
                         due_date = task.dueDate?.toString(),
                         scheduled_date = task.scheduledDate?.toString(),
+                        start_date = task.startDate?.toString(),
+                        end_date = task.endDate?.toString(),
+                        time_span = task.time?.toString(),
+                        recurrence = task.recurrence,
                         priority = task.priority.name,
                     )
                 }
@@ -288,10 +310,7 @@ class NotesDirectoryTaskRepository(
         }
     }
 
-    private fun String.toCalendarDate(): CalendarDate? = runCatching {
-        val parts = split('-')
-        CalendarDate(parts[0].toInt(), parts[1].toInt(), parts[2].toInt())
-    }.getOrNull()
+    private fun String.toCalendarDate(): CalendarDate? = CalendarDate.parse(this)
 
     private data class IndexedFile(
         val listingVersion: FileVersion,
