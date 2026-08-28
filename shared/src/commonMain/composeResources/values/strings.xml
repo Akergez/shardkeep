@@ -128,4 +128,21 @@
     <string name="sync_already_up_to_date">Already up to date</string>
     <string name="sync_result_summary">Pushed %1$d, pulled %2$d</string>
     <string name="workspace_default">Workspace</string>
+    <string name="calendar_title">Calendar</string>
+    <string name="calendar_description">Tasks with a start date go to the “Shardkeep” calendar on this device.</string>
+    <string name="calendar_auto_sync">Sync automatically</string>
+    <string name="calendar_sync_now">Sync calendar</string>
+    <string name="calendar_export_ics">Export .ics</string>
+    <string name="calendar_never_synced">Not synced yet</string>
+    <string name="calendar_error">Could not sync the calendar</string>
+    <string name="start_date">Start date</string>
+    <string name="end_date">End date</string>
+    <string name="event_time">Time</string>
+    <string name="event_time_hint">10:00-18:00</string>
+    <string name="recurrence">Repeat</string>
+    <string name="recurrence_hint">every week on Monday</string>
+    <string name="invalid_time">Enter a time range such as 10:00-18:00</string>
+    <string name="calendar_exported">Exported %1$d events to %2$s</string>
+    <string name="search_tasks">Search files and tasks</string>
+    <string name="search_nothing_found">Nothing found</string>
 </resources>

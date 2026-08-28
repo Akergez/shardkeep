@@ -10,8 +10,17 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.akergez.shardkeep.data.NotesDirectoryQuickNoteRepository
 import com.akergez.shardkeep.data.NotesDirectoryTaskRepository
+import com.akergez.shardkeep.calendar.ICalendarWriter
 import com.akergez.shardkeep.domain.model.TaskFormat
+import com.akergez.shardkeep.domain.model.toCalendarEvents
 import com.akergez.shardkeep.platform.rememberCurrentLocalDate
+import com.akergez.shardkeep.ui.ShardkeepApp
+import com.akergez.shardkeep.ui.WorkspaceOption
+import com.akergez.shardkeep.ui.settings.DEFAULT_IGNORE_PATTERNS
+import com.akergez.shardkeep.ui.settings.SettingsCallbacks
+import com.akergez.shardkeep.ui.settings.SyncConfigDraft
+import com.akergez.shardkeep.ui.setup.FormatSetupScreen
+import com.akergez.shardkeep.ui.setup.NotesDirectorySetupScreen
 import shardkeep.shared.generated.resources.Res
 import shardkeep.shared.generated.resources.*
 import com.akergez.tresse.kmp.TresseConfig
@@ -20,7 +29,10 @@ import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.TresseSyncProgress
 import com.akergez.tresse.kmp.TresseVault
 import com.akergez.tresse.kmp.fileTresseVault
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.compose.resources.getString
@@ -66,6 +78,7 @@ private fun DesktopShardkeepApp() {
     ShardkeepTheme {
         val defaultWorkspaceName = stringResource(Res.string.workspace_default)
         val selectDirectoryTitle = stringResource(Res.string.select_notes_directory)
+        val exportTitle = stringResource(Res.string.calendar_export_ics)
         val syncNotConfiguredError = stringResource(Res.string.sync_not_configured_error)
         val syncTriggerDesktop = stringResource(Res.string.sync_trigger_desktop)
         val syncErrorGeneric = stringResource(Res.string.sync_error_generic)
@@ -237,6 +250,17 @@ private fun DesktopShardkeepApp() {
                         onFailure = { false },
                     )
                 },
+                // Системного календаря у десктопа мы не трогаем — там их несколько
+                // и все чужие; отдаём .ics, который импортируется куда угодно.
+                calendarAvailable = true,
+                onCalendarExport = {
+                    val events = taskRepository.observeTasks().first().toCalendarEvents()
+                    chooseIcsTarget(exportTitle)?.let { target ->
+                        val text = ICalendarWriter.write(events, System.currentTimeMillis())
+                        withContext(Dispatchers.IO) { target.writeText(text) }
+                        getString(Res.string.calendar_exported, events.size, target.name)
+                    }
+                },
                 onSync = { perform(false) },
                 onForcePull = { perform(true) },
                 onWipeChunks = {
@@ -382,6 +406,20 @@ private fun saveDesktopWorkspaces(
             put("path", workspace.path)
             workspace.format?.let { put("format", it.name) }
         }
+    }
+}
+
+/**
+ * Диалог сохранения `.ics`. Расширение дописываем сами: пользователь редко помнит,
+ * какое нужно, а без него календари файл не опознают.
+ */
+private fun chooseIcsTarget(title: String): File? = JFileChooser().apply {
+    dialogTitle = title
+    selectedFile = File("shardkeep.ics")
+}.let { chooser ->
+    if (chooser.showSaveDialog(null) != JFileChooser.APPROVE_OPTION) return null
+    chooser.selectedFile.let { file ->
+        if (file.name.endsWith(".ics", ignoreCase = true)) file else File(file.parentFile, "${file.name}.ics")
     }
 }
 

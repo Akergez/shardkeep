@@ -7,6 +7,7 @@ import com.akergez.shardkeep.domain.model.TaskFilter
 import com.akergez.shardkeep.domain.model.TaskId
 import com.akergez.shardkeep.domain.model.TaskStatus
 import com.akergez.shardkeep.domain.model.TimeRange
+import com.akergez.shardkeep.domain.model.plusDays
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -1,5 +1,7 @@
 package com.akergez.shardkeep
 
+import com.akergez.shardkeep.domain.model.TaskTitleContent
+import com.akergez.shardkeep.domain.model.parseTaskTitleTags
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -25,13 +25,26 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.glance.appwidget.updateAll
 import com.akergez.shardkeep.R
-import com.akergez.shardkeep.SettingsCallbacks
+import com.akergez.shardkeep.ui.AppDeepLink
+import com.akergez.shardkeep.ui.ShardkeepApp
+import com.akergez.shardkeep.ui.WorkspaceOption
+import com.akergez.shardkeep.ui.settings.DEFAULT_IGNORE_PATTERNS
+import com.akergez.shardkeep.ui.settings.SettingsCallbacks
+import com.akergez.shardkeep.ui.settings.SyncConfigDraft
+import com.akergez.shardkeep.ui.setup.FormatSetupScreen
+import com.akergez.shardkeep.ui.setup.NotesDirectoryErrorScreen
+import com.akergez.shardkeep.ui.setup.NotesDirectoryLoadingScreen
+import com.akergez.shardkeep.ui.setup.NotesDirectorySetupScreen
+import com.akergez.shardkeep.calendar.AndroidCalendarSync
+import com.akergez.shardkeep.calendar.CalendarSyncScheduler
 import com.akergez.shardkeep.data.NotesDirectoryTaskRepository
 import com.akergez.shardkeep.data.NotesDirectoryQuickNoteRepository
 import com.akergez.shardkeep.db.DatabaseDriverFactory
 import com.akergez.shardkeep.db.createDatabase
 import com.akergez.shardkeep.domain.model.QuickNote
 import com.akergez.shardkeep.domain.model.TaskFormat
+import com.akergez.shardkeep.domain.model.toCalendarEvents
+import com.akergez.shardkeep.calendar.ICalendarWriter
 import com.akergez.shardkeep.platform.rememberCurrentLocalDate
 import com.akergez.shardkeep.notesdirectory.AndroidSafNotesDirectoryStorage
 import com.akergez.shardkeep.notifications.NotificationScheduler
@@ -53,9 +66,12 @@ import com.akergez.shardkeep.sync.saveLocalSync
 import com.akergez.shardkeep.sync.withLocalSync
 import com.akergez.shardkeep.sync.wipeChunkStore
 import com.akergez.shardkeep.sync.withoutRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.text.DateFormat
+import java.util.Date
 
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = mutableStateOf<AppDeepLink?>(null)
@@ -165,6 +181,30 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
     var notificationsEnabled by remember {
         mutableStateOf(preferences.getBoolean("notifications_enabled", true))
     }
+    var calendarSyncEnabled by remember(activeWorkspace.id) {
+        mutableStateOf(preferences.getBoolean(CalendarSyncScheduler.PREF_ENABLED, false))
+    }
+    var calendarLastSync by remember(activeWorkspace.id) {
+        mutableStateOf(preferences.getLong(CalendarSyncScheduler.PREF_LAST_SYNC, 0L))
+    }
+    // Разрешение спрашиваем в момент включения тумблера: до него календарь нам не
+    // нужен, а системный диалог на пустом месте — верный способ получить отказ.
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        val allowed = granted.values.all { it }
+        calendarSyncEnabled = allowed
+        preferences.edit().putBoolean(CalendarSyncScheduler.PREF_ENABLED, allowed).apply()
+        CalendarSyncScheduler.schedule(applicationContext, activeWorkspace.id, allowed)
+        if (allowed) CalendarSyncScheduler.syncNow(applicationContext, activeWorkspace.id)
+    }
+    val pendingExport = remember { mutableStateOf<CompletableDeferred<Uri?>?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/calendar")
+    ) { uri ->
+        pendingExport.value?.complete(uri)
+        pendingExport.value = null
+    }
     val database = remember { createDatabase(DatabaseDriverFactory(applicationContext)) }
     val storage = remember(uri) { AndroidSafNotesDirectoryStorage(applicationContext, uri) }
     val configSync = remember(uri) { TresseSync(safTresseVault(applicationContext, uri)) }
@@ -190,6 +230,12 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
         syncConfig = config
         pushSyncStatus(syncStatus, config)
         TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, config)
+    }
+
+    // Тумблер живёт в настройках, а работа — в WorkManager: после перезапуска
+    // приложения расписание надо восстановить, иначе выгрузка тихо перестанет идти.
+    LaunchedEffect(activeWorkspace.id, calendarSyncEnabled) {
+        CalendarSyncScheduler.schedule(applicationContext, activeWorkspace.id, calendarSyncEnabled)
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -248,6 +294,66 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     notificationsEnabled = enabled
                     if (enabled) NotificationScheduler.scheduleNext(applicationContext, activeWorkspace.id)
                     else NotificationScheduler.cancel(applicationContext, activeWorkspace.id)
+                },
+                calendarAvailable = true,
+                calendarSyncEnabled = calendarSyncEnabled,
+                onCalendarSyncEnabledChange = { enabled ->
+                    if (enabled && !AndroidCalendarSync.hasPermission(applicationContext)) {
+                        calendarPermissionLauncher.launch(AndroidCalendarSync.permissions)
+                    } else {
+                        calendarSyncEnabled = enabled
+                        preferences.edit().putBoolean(CalendarSyncScheduler.PREF_ENABLED, enabled).apply()
+                        CalendarSyncScheduler.schedule(applicationContext, activeWorkspace.id, enabled)
+                        if (enabled) CalendarSyncScheduler.syncNow(applicationContext, activeWorkspace.id)
+                    }
+                },
+                calendarLastSync = calendarLastSync
+                    .takeIf { it > 0 }
+                    ?.let { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it)) },
+                onCalendarSyncNow = {
+                    if (!AndroidCalendarSync.hasPermission(applicationContext)) {
+                        calendarPermissionLauncher.launch(AndroidCalendarSync.permissions)
+                        getString(R.string.calendar_permission_required)
+                    } else {
+                        val events = repository.observeTasks().first().toCalendarEvents()
+                        val result = withContext(Dispatchers.IO) {
+                            AndroidCalendarSync.sync(
+                                applicationContext,
+                                activeWorkspace.id,
+                                activeWorkspace.name,
+                                events,
+                            )
+                        }
+                        val now = System.currentTimeMillis()
+                        preferences.edit().putLong(CalendarSyncScheduler.PREF_LAST_SYNC, now).apply()
+                        calendarLastSync = now
+                        if (result.changed) {
+                            getString(
+                                R.string.calendar_sync_summary,
+                                result.added,
+                                result.updated,
+                                result.removed,
+                            )
+                        } else {
+                            getString(R.string.calendar_sync_unchanged)
+                        }
+                    }
+                },
+                onCalendarExport = {
+                    val events = repository.observeTasks().first().toCalendarEvents()
+                    val target = CompletableDeferred<Uri?>()
+                        .also { pendingExport.value = it }
+                        .also { exportLauncher.launch("shardkeep.ics") }
+                        .await()
+                    target?.let { uri ->
+                        val text = ICalendarWriter.write(events, System.currentTimeMillis())
+                        withContext(Dispatchers.IO) {
+                            contentResolver.openOutputStream(uri, "wt")?.use { stream ->
+                                stream.write(text.encodeToByteArray())
+                            }
+                        }
+                        getString(R.string.calendar_export_saved, events.size)
+                    }
                 },
                 syncConfig = syncConfig?.toDraft(),
                 syncConfigured = syncConfig?.isComplete() == true,

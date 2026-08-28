@@ -38,6 +38,18 @@ data class Task(
     val status: TaskStatus,
     val dueDate: CalendarDate?,
     val scheduledDate: CalendarDate? = null,
+    /** 🛫 `[start:: …]` — день, когда событие начинается. Он же делает таску событием. */
+    val startDate: CalendarDate? = null,
+    /** 🏁 `[end:: …]` — последний день события; без него событие укладывается в [startDate]. */
+    val endDate: CalendarDate? = null,
+    /** ⏰ `[time:: …]` — границы внутри дня; каждая половина необязательна. */
+    val time: TaskTimeSpan? = null,
+    /**
+     * 🔁 `[repeat:: …]` — текст правила как он записан в заметке. Хранится сырым:
+     * при перезаписи строки он должен вернуться в файл слово в слово, даже если
+     * [RecurrenceTextParser] его не понял.
+     */
+    val recurrence: String? = null,
     val priority: TaskPriority = TaskPriority.Normal,
     val location: NotesDirectoryLocation,
 )

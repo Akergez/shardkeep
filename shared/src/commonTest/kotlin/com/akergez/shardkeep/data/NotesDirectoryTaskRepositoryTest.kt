@@ -5,7 +5,10 @@ import com.akergez.shardkeep.domain.model.NotesDirectoryLocation
 import com.akergez.shardkeep.domain.model.QuickNote
 import com.akergez.shardkeep.domain.model.Task
 import com.akergez.shardkeep.domain.model.TaskId
+import com.akergez.shardkeep.domain.model.TaskFormat
 import com.akergez.shardkeep.domain.model.TaskStatus
+import com.akergez.shardkeep.domain.model.TaskTimeSpan
+import com.akergez.shardkeep.domain.model.TimeOfDay
 import com.akergez.shardkeep.domain.repository.TaskDestination
 import com.akergez.shardkeep.notesdirectory.FileVersion
 import com.akergez.shardkeep.notesdirectory.NotesDirectoryChange
@@ -55,6 +58,61 @@ class NotesDirectoryTaskRepositoryTest {
             storage.content("Shardkeep/Inbox.md"),
         )
         assertEquals("created", repository.observeTasks().first().single().title)
+    }
+
+    @Test
+    fun eventAttributesRoundTripThroughMarkdown() = runTest {
+        val storage = FakeNotesDirectoryStorage(emptyMap())
+        val repository = NotesDirectoryTaskRepository(storage)
+        val event = Task(
+            id = TaskId("new"),
+            title = "Конференция",
+            status = TaskStatus.Todo,
+            dueDate = null,
+            startDate = CalendarDate(2026, 9, 1),
+            endDate = CalendarDate(2026, 9, 3),
+            time = TaskTimeSpan(TimeOfDay(10, 0), TimeOfDay(18, 0)),
+            recurrence = "every year",
+            location = NotesDirectoryLocation("Plan.md"),
+        )
+
+        repository.create(event)
+
+        assertEquals(
+            "- [ ] Конференция 🔁 every year 🛫 2026-09-01 🏁 2026-09-03 ⏰ 10:00-18:00",
+            storage.content("Plan.md"),
+        )
+        val indexed = repository.observeTasks().first().single()
+        assertEquals(event.startDate, indexed.startDate)
+        assertEquals(event.endDate, indexed.endDate)
+        assertEquals(event.time, indexed.time)
+        assertEquals(event.recurrence, indexed.recurrence)
+        assertEquals(event.title, indexed.title)
+    }
+
+    @Test
+    fun eventAttributesRoundTripInDataviewFormat() = runTest {
+        val storage = FakeNotesDirectoryStorage(emptyMap())
+        val repository = NotesDirectoryTaskRepository(storage, TaskFormat.Dataview)
+
+        repository.create(
+            Task(
+                id = TaskId("new"),
+                title = "Конференция",
+                status = TaskStatus.Todo,
+                dueDate = null,
+                startDate = CalendarDate(2026, 9, 1),
+                endDate = CalendarDate(2026, 9, 3),
+                time = TaskTimeSpan(null, TimeOfDay(18, 0)),
+                location = NotesDirectoryLocation("Plan.md"),
+            ),
+        )
+
+        val indexed = repository.observeTasks().first().single()
+        assertEquals(CalendarDate(2026, 9, 1), indexed.startDate)
+        assertEquals(CalendarDate(2026, 9, 3), indexed.endDate)
+        assertEquals(TaskTimeSpan(null, TimeOfDay(18, 0)), indexed.time)
+        assertEquals("Конференция", indexed.title)
     }
 
     @Test
