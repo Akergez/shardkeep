@@ -8,7 +8,6 @@ plugins {
 }
 
 val applicationVersion = providers.environmentVariable("APP_VERSION")
-    .orElse(providers.environmentVariable("CI_COMMIT_TAG"))
     .map { raw ->
         raw.removePrefix("v").substringBefore('-')
             .takeIf { it.matches(Regex("[0-9]+(\\.[0-9]+){0,2}")) }

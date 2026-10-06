@@ -1,0 +1,26 @@
+name: Gradle
+description: The JDK every build runs on, and the Gradle cache they share.
+
+inputs:
+  java-version:
+    description: Temurin release to install.
+    required: false
+    default: "21"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+
+    # The wrapper's distribution and downloaded dependencies only; build
+    # outputs are not worth their upload for a build that runs once per tag.
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/wrapper
+          ~/.gradle/caches/modules-2
+        key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+        restore-keys: gradle-${{ runner.os }}-${{ runner.arch }}-

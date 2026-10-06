@@ -8,13 +8,19 @@ plugins {
 }
 
 val applicationVersionName = providers.environmentVariable("APP_VERSION")
-    .orElse(providers.environmentVariable("CI_COMMIT_TAG"))
-    .orElse(providers.environmentVariable("CI_COMMIT_SHORT_SHA"))
     .orElse("1.0.0")
 
-val applicationVersionCode = providers.environmentVariable("CI_PIPELINE_IID")
-    .map { it.toIntOrNull()?.coerceIn(1, 2_100_000_000) ?: 1 }
-    .orElse(1)
+// v2.3.4 -> 2003004: grows with every tag, so a new build always installs over an older one.
+val applicationVersionCode = applicationVersionName.map { raw ->
+    val parts = raw.removePrefix("v").substringBefore('-').split('.').map { it.toIntOrNull() }
+    if (parts.size <= 3 && parts.all { it != null && it in 0..999 }) {
+        (parts.filterNotNull() + listOf(0, 0)).take(3)
+            .fold(0) { code, part -> code * 1000 + part }
+            .coerceAtLeast(1)
+    } else {
+        1
+    }
+}
 
 apply(plugin = "org.jetbrains.kotlin.android")
 

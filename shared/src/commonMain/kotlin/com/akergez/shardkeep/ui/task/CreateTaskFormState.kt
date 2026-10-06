@@ -34,7 +34,7 @@ class CreateTaskFormState(
     var title by mutableStateOf(initialTask?.title.orEmpty())
     var path by mutableStateOf(defaultPath)
     var heading by mutableStateOf(defaultHeading)
-    var dueDate by mutableStateOf(initialTask?.dueDate ?: if (initialTask == null) defaultDate else null)
+    var dueDate by mutableStateOf(initialTask?.dueDate)
     var scheduledDate by mutableStateOf(initialTask?.scheduledDate)
     var startDate by mutableStateOf(initialTask?.startDate)
     var endDate by mutableStateOf(initialTask?.endDate)

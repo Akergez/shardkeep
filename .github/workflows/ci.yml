@@ -1,0 +1,234 @@
+# Nothing runs on a commit: everything here is built from a tag, and a tag
+# always ends in a release.
+#
+# A run:
+#   build     an Android package, Linux RPMs (x86_64, arm64), a macOS disk
+#             image (arm64) and a Windows installer (x86_64)
+#   release   a GitHub release for the tag with every package attached
+#
+# The Linux and macOS packages come from jpackage, which only builds for the
+# machine it runs on, so each has a runner of its own. The Windows installer
+# is built on Linux; see the job for what stands in for a Windows machine.
+
+name: CI
+
+on:
+  push:
+    tags: ["**"]
+
+env:
+  # What both build scripts take the version from. The desktop one strips the
+  # leading `v`; the Android one keeps the tag as it is.
+  APP_VERSION: ${{ github.ref_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------- build
+
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/gradle
+      # The SDK is the runner's own; the versions are those the build names.
+      - run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # `yes` is killed when sdkmanager has read enough, which is not a failure.
+          (yes || true) | "$sdkmanager" --licenses > /dev/null
+          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+      - name: Build
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+          ./gradlew --no-daemon :androidApp:assembleRelease
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs androidApp/build/outputs/apk/release/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-android
+          path: androidApp/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/gradle
+      - run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q rpm
+      - run: ./gradlew --no-daemon :desktopApp:packageRpm
+      # The package has to carry its desktop entry.
+      - run: rpm -qpl desktopApp/build/compose/binaries/main/rpm/*.rpm | grep -E '/[^/]+\.desktop$'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux-${{ matrix.arch }}
+          path: desktopApp/build/compose/binaries/main/rpm/*.rpm
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/gradle
+        with:
+          java-version: "21.0.5+11"
+      - run: ./gradlew --no-daemon :desktopApp:createDistributable
+      - run: |
+          APP_BUNDLE=$(find desktopApp/build/compose/binaries/main/app -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$APP_BUNDLE"
+          STAGING=$(mktemp -d)
+          ditto "$APP_BUNDLE" "$STAGING/$(basename "$APP_BUNDLE")"
+          ln -s /Applications "$STAGING/Applications"
+          mkdir -p desktopApp/build/compose/binaries/main/dmg
+          hdiutil create -volname "Shardkeep" -srcfolder "$STAGING" -ov -format UDZO "desktopApp/build/compose/binaries/main/dmg/Shardkeep-${GITHUB_REF_NAME}.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-macos-arm64
+          path: desktopApp/build/compose/binaries/main/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  # Windows-инсталлятор собирается здесь же, на Linux, чтобы не платить за
+  # windows-раннер. Пакует его pinpit, а не jpackage: jpackage кросс-компиляцию
+  # объявил non-goal и работает только на целевой ОС. pinpit скачивает Windows JDK
+  # сам, собирает из него рантайм через jlink (jlink кросс-платформенный), а WiX
+  # гоняет под Wine.
+  #
+  # Wine берётся из штатного репозитория дистрибутива, а не с dl.winehq.org: пакет
+  # оттуда ставится в /opt/wine-stable, куда pinpit и обращается по абсолютному
+  # пути, поэтому дистрибутивный /usr/bin/wine доводится симлинками. candle.exe и
+  # light.exe из WiX требуют CLR внутри Wine: обычный Linux mono-complete его не
+  # предоставляет, поэтому совместимый Wine Mono ставится отдельным MSI ниже.
+  #
+  # --no-configuration-cache обязателен: pinpit форкнут от Compose plugin 1.2.1 и
+  # на configuration cache падает с "property 'jdk' has no value".
+  #
+  # Логи Wine и сгенерированные WiX-файлы сохраняются при любом исходе джобы,
+  # поскольку candle/light могут упасть до появления MSI.
+  windows:
+    runs-on: ubuntu-24.04
+    # Pin the Ubuntu release because Wine and Wine Mono must stay compatible.
+    container: eclipse-temurin:21-jdk-noble
+    env:
+      WINE_MONO_VERSION: "9.0.0"
+      XDG_RUNTIME_DIR: /tmp/xdg-runtime
+      # В контейнере HOME принадлежит пользователю раннера, а джоба идёт от
+      # root: Wine отказывается заводить префикс в чужом каталоге.
+      WINEPREFIX: /root/.wine
+      # Keep Wine's errors and warnings in the job log. The pinpit Gradle task also
+      # writes the complete candle/light output under build/pinpit/logs (see artifacts).
+      WINEDEBUG: "err,warn"
+    steps:
+      - uses: actions/checkout@v4
+      # ~/.pinpit: скачанный pinpit Windows JDK и MSI с Wine Mono.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches/modules-2
+            ~/.pinpit
+          key: windows-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties', '.github/workflows/ci.yml') }}
+          restore-keys: windows-
+      - run: |
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          dpkg --add-architecture i386
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl wine wine32 wine64
+          mkdir -p /opt/wine-stable/bin
+          ln -sf /usr/bin/wine /opt/wine-stable/bin/wine
+          ln -sf /usr/bin/winepath /opt/wine-stable/bin/winepath
+          ln -sf /usr/bin/wineserver /opt/wine-stable/bin/wineserver
+      # WiX 3.11 is a .NET Framework application. Native Linux Mono does not
+      # provide Wine's CLR, so install the matching Wine Mono package explicitly.
+      - run: |
+          mkdir -p "$HOME/.pinpit"
+          WINE_MONO_MSI="$HOME/.pinpit/wine-mono-${WINE_MONO_VERSION}-x86.msi"
+          if [ ! -s "$WINE_MONO_MSI" ]; then
+            curl --fail --location --retry 3 \
+              --output "$WINE_MONO_MSI" \
+              "https://dl.winehq.org/wine/wine-mono/${WINE_MONO_VERSION}/wine-mono-${WINE_MONO_VERSION}-x86.msi"
+          fi
+          wine msiexec /i "$WINE_MONO_MSI" /qn
+          wineserver -w
+      - run: ./gradlew --no-daemon --no-configuration-cache :desktopApp:pinpitPackageDefaultMsiX64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows-x86_64
+          path: desktopApp/build/pinpit/binaries/main-default/windows/x64/msi/*.msi
+          if-no-files-found: error
+          retention-days: 7
+      # candle.exe failures happen before an MSI exists, so diagnostics must be
+      # uploaded for failed jobs as well.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-diagnostics
+          path: |
+            desktopApp/build/pinpit/logs/**/*
+            desktopApp/build/pinpit/tmp/**/wix/*.wxs
+          retention-days: 7
+
+  # -------------------------------------------------------------- release
+
+  release:
+    # Every package has to exist before the release links to it.
+    needs: [android, linux, macos, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      # One directory per artifact: the two RPMs are told apart by it.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir release
+          one() {
+            file=$(find "dist/$1" -name "$2" -type f -print -quit)
+            test -n "$file"
+            mv "$file" "release/$3"
+          }
+          one dist-android '*.apk' "Shardkeep-$TAG.apk"
+          one dist-linux-x86_64 '*.rpm' "Shardkeep-$TAG-linux-x86_64.rpm"
+          one dist-linux-arm64 '*.rpm' "Shardkeep-$TAG-linux-arm64.rpm"
+          one dist-macos-arm64 '*.dmg' "Shardkeep-$TAG-macOS-arm64.dmg"
+          one dist-windows-x86_64 '*.msi' "Shardkeep-$TAG-windows-x86_64.msi"
+
+          cat > notes.md <<NOTES
+          ## Downloads
+          - Android APK
+          - Linux RPM (x86_64)
+          - Linux RPM (arm64)
+          - macOS DMG (arm64)
+          - Windows MSI (x86_64)
+          NOTES
+          gh release create "$TAG" release/* \
+            --title "Shardkeep $TAG" --notes-file notes.md
