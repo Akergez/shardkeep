@@ -29,9 +29,17 @@ dependencyResolutionManagement {
             mavenLocal()
         }
         maven {
-            name = "TresseGitLab"
+            name = "TresseGitHub"
             url = uri(providers.environmentVariable("TRESSE_KMP_MAVEN_URL")
-                .orElse("https://gitlab.com/api/v4/projects/84164267/packages/maven").get())
+                .orElse("https://maven.pkg.github.com/akergez/tresse-kmp").get())
+            // GitHub Packages asks for a token even for a public package: gpr.user and gpr.key
+            // (a token with read:packages) in ~/.gradle/gradle.properties, or the CI's own.
+            credentials {
+                username = providers.gradleProperty("gpr.user")
+                    .orElse(providers.environmentVariable("GITHUB_ACTOR")).orNull
+                password = providers.gradleProperty("gpr.key")
+                    .orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
+            }
             content { includeGroup("com.akergez.tresse") }
         }
         maven {

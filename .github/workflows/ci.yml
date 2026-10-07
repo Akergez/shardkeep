@@ -20,9 +20,12 @@ env:
   # What both build scripts take the version from. The desktop one strips the
   # leading `v`; the Android one keeps the tag as it is.
   APP_VERSION: ${{ github.ref_name }}
+  # tresse-kmp comes from GitHub Packages, which wants a token even to read.
+  GITHUB_TOKEN: ${{ github.token }}
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   # ---------------------------------------------------------------- build
