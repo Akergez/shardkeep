@@ -52,8 +52,10 @@ import com.akergez.shardkeep.ui.notes.NoteEditorScreen
 import com.akergez.shardkeep.ui.notes.NoteEditorTarget
 import com.akergez.shardkeep.ui.notes.QuickNotesScreen
 import com.akergez.shardkeep.ui.notes.QuickNotesViewModel
+import com.akergez.shardkeep.ui.settings.ServerConnectDialog
 import com.akergez.shardkeep.ui.settings.SettingsCallbacks
 import com.akergez.shardkeep.ui.settings.SettingsScreen
+import com.akergez.shardkeep.ui.settings.SyncScreen
 import com.akergez.shardkeep.ui.task.CreateTaskDialog
 import com.akergez.shardkeep.ui.tasks.TodayTasksScreen
 import org.jetbrains.compose.resources.painterResource
@@ -230,6 +232,12 @@ fun ShardkeepApp(
                             )
                         }
 
+                        AppSection.Sync -> SyncScreen(
+                            callbacks = settingsCallbacks,
+                            onSaved = { viewModel.post(UiMessage.SettingsSaved) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+
                         AppSection.Settings -> SettingsScreen(
                             callbacks = settingsCallbacks,
                             onSaved = { viewModel.post(UiMessage.SettingsSaved) },
@@ -284,6 +292,11 @@ fun ShardkeepApp(
                 }
             },
         )
+    }
+    // Возврат с серверной страницы показываем поверх любого раздела: браузер мог
+    // увести пользователя из настроек, а решение по подключению всё равно ждёт здесь.
+    settingsCallbacks?.serverConnectEvent?.let { event ->
+        ServerConnectDialog(event = event, onResolve = settingsCallbacks.onServerConnectResolve)
     }
 }
 
@@ -369,7 +382,7 @@ private fun ShardkeepActions(
                     )
                 }
             }
-            AppSection.Settings -> Unit
+            AppSection.Sync, AppSection.Settings -> Unit
         }
     }
 }

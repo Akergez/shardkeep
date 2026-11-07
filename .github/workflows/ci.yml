@@ -20,9 +20,19 @@ env:
   # What both build scripts take the version from. The desktop one strips the
   # leading `v`; the Android one keeps the tag as it is.
   APP_VERSION: ${{ github.ref_name }}
+  # Baked into the app as the default Tresse sync server (see TRESSE_SERVER_URL
+  # in shared/build.gradle.kts): prefilled on the Sync screen, the user may replace it.
+  TRESSE_SERVER_URL: ${{ vars.TRESSE_SERVER_URL }}
+  # settings.gradle.kts reads tresse-kmp from GitHub Packages with GITHUB_ACTOR
+  # and GITHUB_TOKEN; Actions sets the actor but never exports the token itself.
+  # The package lives in another repository, so it must grant this one read
+  # access (package settings → Manage Actions access).
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 permissions:
+  # packages: read — GITHUB_TOKEN читает GitHub Packages, где лежит tresse-kmp.
   contents: read
+  packages: read
 
 jobs:
   # ---------------------------------------------------------------- build

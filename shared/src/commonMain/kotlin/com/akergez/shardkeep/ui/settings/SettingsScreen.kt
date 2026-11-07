@@ -37,6 +37,7 @@ import shardkeep.shared.generated.resources.settings
 /**
  * Экран настроек. Сам по себе он только собирает блоки в столбец: платформенная
  * начинка приходит в [SettingsCallbacks], а какой блок показывать — решают её поля.
+ * Синхронизация живёт на своём экране ([SyncScreen]).
  */
 @Composable
 fun SettingsScreen(
@@ -64,10 +65,6 @@ fun SettingsScreen(
         }
 
         QuickNotesFolderSetting(callbacks, onSaved)
-
-        HorizontalDivider()
-
-        SyncSettingsSection(callbacks, onSaved)
 
         HorizontalDivider()
 

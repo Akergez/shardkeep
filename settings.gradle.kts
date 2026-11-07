@@ -29,9 +29,19 @@ dependencyResolutionManagement {
             mavenLocal()
         }
         maven {
-            name = "TresseGitLab"
+            name = "TresseGitHubPackages"
+            // Чтение GitHub Packages без авторизации отдаёт 401: для локальной сборки
+            // задайте GITHUB_ACTOR и GITHUB_TOKEN (classic PAT с read:packages).
             url = uri(providers.environmentVariable("TRESSE_KMP_MAVEN_URL")
-                .orElse("https://gitlab.com/api/v4/projects/84164267/packages/maven").get())
+                .orElse("https://maven.pkg.github.com/akergez/tresse-kmp").get())
+            credentials {
+                username = providers.environmentVariable("TRESSE_GITHUB_ACTOR")
+                    .orElse(providers.environmentVariable("GITHUB_ACTOR").orElse(""))
+                    .get()
+                password = providers.environmentVariable("TRESSE_GITHUB_TOKEN")
+                    .orElse(providers.environmentVariable("GITHUB_TOKEN").orElse(""))
+                    .get()
+            }
             content { includeGroup("com.akergez.tresse") }
         }
         maven {

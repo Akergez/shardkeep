@@ -316,6 +316,9 @@ class ShardkeepViewModel : ViewModel() {
                     section.value = AppSection.Notes
                 }
             }
+            // Сам возврат обрабатывает хост; здесь только доставляем пользователя
+            // на экран синхронизации, где результат покажут и где начиналось подключение.
+            is AppDeepLink.ServerConnect -> section.value = AppSection.Sync
         }
     }
 

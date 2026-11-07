@@ -28,14 +28,10 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import shardkeep.shared.generated.resources.Res
 import shardkeep.shared.generated.resources.access_token
-import shardkeep.shared.generated.resources.action_import
 import shardkeep.shared.generated.resources.auto_sync
 import shardkeep.shared.generated.resources.cancel
-import shardkeep.shared.generated.resources.config_import_error
 import shardkeep.shared.generated.resources.encryption_key
 import shardkeep.shared.generated.resources.ignore_patterns
-import shardkeep.shared.generated.resources.import_config
-import shardkeep.shared.generated.resources.import_config_hint
 import shardkeep.shared.generated.resources.repo_id
 import shardkeep.shared.generated.resources.s3_access_key_id
 import shardkeep.shared.generated.resources.s3_bucket
@@ -51,43 +47,19 @@ import shardkeep.shared.generated.resources.storage_s3
 import shardkeep.shared.generated.resources.sync_config_hint
 import shardkeep.shared.generated.resources.sync_debounce_seconds
 import shardkeep.shared.generated.resources.sync_interval_minutes
-import shardkeep.shared.generated.resources.sync_title
 import shardkeep.shared.generated.resources.wipe_chunks
 import shardkeep.shared.generated.resources.wipe_chunks_action
 import shardkeep.shared.generated.resources.wipe_chunks_confirm
 import shardkeep.shared.generated.resources.wipe_chunks_hint
 
-/** Блок настроек синхронизации: статус, поля конфига, импорт и сброс локального хранилища. */
+/**
+ * Вкладка «Подробно» экрана синхронизации: все поля удалённого хранилища Tresse
+ * (сервер или свой S3), расписание, игнор-правила и сброс локального хранилища.
+ */
 @Composable
-fun ColumnScope.SyncSettingsSection(callbacks: SettingsCallbacks, onSaved: () -> Unit) {
+fun ColumnScope.SyncDetailsTab(callbacks: SettingsCallbacks, onSaved: () -> Unit) {
     val scope = rememberCoroutineScope()
 
-    Text(stringResource(Res.string.sync_title), style = MaterialTheme.typography.titleMedium)
-    var syncing by remember { mutableStateOf(false) }
-    callbacks.syncState?.let { state ->
-        SyncStatusCard(
-            stateFlow = state,
-            syncing = syncing,
-            onSyncNow = callbacks.onSync?.let { sync ->
-                {
-                    scope.launch {
-                        syncing = true
-                        runCatching { sync() }
-                        syncing = false
-                    }
-                }
-            },
-            onForcePull = callbacks.onForcePull?.let { forcePull ->
-                {
-                    scope.launch {
-                        syncing = true
-                        runCatching { forcePull() }
-                        syncing = false
-                    }
-                }
-            },
-        )
-    }
     Text(
         stringResource(Res.string.sync_config_hint),
         style = MaterialTheme.typography.bodySmall,
@@ -157,30 +129,7 @@ fun ColumnScope.SyncSettingsSection(callbacks: SettingsCallbacks, onSaved: () ->
         minLines = 2,
     )
 
-    var configString by rememberSaveable { mutableStateOf("") }
-    var configImportFailed by rememberSaveable { mutableStateOf(false) }
-    OutlinedTextField(
-        value = configString,
-        onValueChange = { configString = it; configImportFailed = false },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(stringResource(Res.string.import_config)) },
-        placeholder = { Text(stringResource(Res.string.import_config_hint)) },
-        minLines = 5,
-    )
-    if (configImportFailed) {
-        Text(stringResource(Res.string.config_import_error), color = MaterialTheme.colorScheme.error)
-    }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = {
-            scope.launch {
-                val imported = callbacks.onImportSyncConfig(configString)
-                configImportFailed = !imported
-                if (imported) {
-                    configString = ""
-                    onSaved()
-                }
-            }
-        }) { Text(stringResource(Res.string.action_import)) }
         TextButton(onClick = {
             scope.launch {
                 callbacks.onSyncConfigChange(form.toDraft())
@@ -238,7 +187,7 @@ private fun ColumnScope.WipeChunksButton(onWipe: suspend () -> Unit, onSaved: ()
 
 /** Однострочное поле настроек: их тут много и все одинаковые. */
 @Composable
-private fun SettingsField(
+internal fun SettingsField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,

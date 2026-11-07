@@ -10,8 +10,10 @@ import shardkeep.shared.generated.resources.ic_article
 import shardkeep.shared.generated.resources.ic_calendar_today
 import shardkeep.shared.generated.resources.ic_format_list
 import shardkeep.shared.generated.resources.ic_settings
+import shardkeep.shared.generated.resources.ic_sync
 import shardkeep.shared.generated.resources.quick_notes
 import shardkeep.shared.generated.resources.settings
+import shardkeep.shared.generated.resources.sync_title
 import shardkeep.shared.generated.resources.tasks
 
 /**
@@ -26,5 +28,6 @@ fun AppNavigationDestinations(
     item(AppSection.Tasks, Res.drawable.ic_calendar_today, Res.string.tasks)
     item(AppSection.AllTasks, Res.drawable.ic_format_list, Res.string.all_tasks)
     if (showNotes) item(AppSection.Notes, Res.drawable.ic_article, Res.string.quick_notes)
+    item(AppSection.Sync, Res.drawable.ic_sync, Res.string.sync_title)
     item(AppSection.Settings, Res.drawable.ic_settings, Res.string.settings)
 }

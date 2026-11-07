@@ -22,6 +22,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Возврат с серверной страницы подключения синка: страница открывает
+                 shardkeep://tresse-connect?state=…&config=tresse%3A%2F%2F… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="shardkeep" android:host="tresse-connect" />
+            </intent-filter>
         </activity>
 
         <activity

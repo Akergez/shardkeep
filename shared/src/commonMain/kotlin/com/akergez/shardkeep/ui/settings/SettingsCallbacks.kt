@@ -1,6 +1,8 @@
 package com.akergez.shardkeep.ui.settings
 
 import com.akergez.shardkeep.SyncState
+import com.akergez.shardkeep.sync.ServerConnectEvent
+import com.akergez.shardkeep.sync.ServerConnectFailure
 import kotlinx.coroutines.flow.StateFlow
 
 data class SettingsCallbacks(
@@ -11,7 +13,13 @@ data class SettingsCallbacks(
     val syncConfig: SyncConfigDraft? = null,
     val syncConfigured: Boolean = false,
     val onSyncConfigChange: suspend (SyncConfigDraft) -> Unit = { },
-    val onImportSyncConfig: suspend (String) -> Boolean = { false },
+    /**
+     * Imports a `tresse://` string or a `tresse.toml` body into this replica's config;
+     * null on success, otherwise why it was refused.
+     */
+    val onImportSyncConfig: suspend (String) -> ServerConnectFailure? = { ServerConnectFailure.Decode },
+    /** The complete config as a shareable `tresse://` string; null until sync is fully set up. */
+    val syncConfigString: String? = null,
     /** Runs a sync and returns a short human-readable summary; throws on failure. */
     val onSync: (suspend () -> String)? = null,
     /** Pulls remote state into an uninitialized local vault without committing first. */
@@ -33,4 +41,15 @@ data class SettingsCallbacks(
     val onCalendarExport: (suspend () -> String?)? = null,
     /** Human-readable moment of the last successful export; null before the first one. */
     val calendarLastSync: String? = null,
+    /** Default Tresse server baked in at build time (TRESSE_SERVER_URL); may be blank. */
+    val serverConnectUrl: String = "",
+    /**
+     * Opens the connect page of the given server in a browser; false when the address
+     * was refused (not https) or the browser could not be opened.
+     */
+    val onServerConnectBegin: (suspend (server: String) -> Boolean)? = null,
+    /** Verified server return waiting for the user; resolved via [onServerConnectResolve]. */
+    val serverConnectEvent: ServerConnectEvent? = null,
+    /** true applies the pending config, false or a dismissed dialog drops it. */
+    val onServerConnectResolve: (accept: Boolean) -> Unit = { },
 )

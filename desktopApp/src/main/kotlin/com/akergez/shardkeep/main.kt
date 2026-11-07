@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -24,14 +25,21 @@ import com.akergez.shardkeep.ui.setup.NotesDirectorySetupScreen
 import shardkeep.shared.generated.resources.Res
 import shardkeep.shared.generated.resources.*
 import com.akergez.tresse.kmp.TresseConfig
-import com.akergez.tresse.kmp.TresseConfigString
+import com.akergez.tresse.kmp.TresseServerLink
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.TresseSyncProgress
 import com.akergez.tresse.kmp.TresseVault
 import com.akergez.tresse.kmp.fileTresseVault
+import com.akergez.shardkeep.sync.ConfigImportRefused
+import com.akergez.shardkeep.sync.SERVER_CONNECT_TTL_MS
+import com.akergez.shardkeep.sync.ServerConnectEvent
+import com.akergez.shardkeep.sync.ServerConnectFailure
+import com.akergez.shardkeep.sync.mapServerConnectFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -76,6 +84,7 @@ private fun configureMacOsApplication() {
 @Composable
 private fun DesktopShardkeepApp() {
     ShardkeepTheme {
+        val scope = rememberCoroutineScope()
         val defaultWorkspaceName = stringResource(Res.string.workspace_default)
         val selectDirectoryTitle = stringResource(Res.string.select_notes_directory)
         val exportTitle = stringResource(Res.string.calendar_export_ics)
@@ -124,6 +133,13 @@ private fun DesktopShardkeepApp() {
         val syncStore = remember(activeWorkspace.id) { SyncStatusStore() }
         val syncMutex = remember(activeWorkspace.id) { Mutex() }
         var syncConfig by remember(storage) { mutableStateOf<TresseConfig?>(null) }
+        // Подключение через сервер: попытка хранится в настройках воркспейса, слитый
+        // конфиг ждёт подтверждения пользователя, возврат браузера ловит локальный
+        // приёмник на localhost.
+        var connectPending by remember(activeWorkspace.id) { mutableStateOf(loadConnectAttempt(preferences)) }
+        var serverConnectEvent by remember(activeWorkspace.id) { mutableStateOf<ServerConnectEvent?>(null) }
+        var connectMerged by remember(activeWorkspace.id) { mutableStateOf<TresseConfig?>(null) }
+        var returnedConnect by remember(activeWorkspace.id) { mutableStateOf<String?>(null) }
 
         fun syncEngine(config: TresseConfig) = TresseSync(fileTresseVault(root, config.ignorePatterns))
         suspend fun refresh() {
@@ -191,6 +207,33 @@ private fun DesktopShardkeepApp() {
             }
         }
 
+        // Возврат с серверной страницы пришёл на localhost-приёмник: проверяем
+        // попытку и показываем диалог подтверждения.
+        LaunchedEffect(returnedConnect) {
+            val returned = returnedConnect ?: return@LaunchedEffect
+            returnedConnect = null
+            val pending = connectPending
+            serverConnectEvent = if (pending == null || System.currentTimeMillis() > pending.expiresAtMs) {
+                ServerConnectEvent.Failed(ServerConnectFailure.LinkMismatch)
+            } else {
+                runCatching {
+                    val current = syncConfig ?: TresseConfig(ignorePatterns = DEFAULT_IGNORE_PATTERNS)
+                    val merged = TresseServerLink.accept(returned, current, pending.attempt) {
+                        // newKey вызывается только для нового репозитория; генерация
+                        // ключа — короткий FFI-вызов без IO.
+                        runBlocking { TresseSync(fileTresseVault(root)).generateEncryptionKey() }
+                    }
+                    connectMerged = merged
+                    ServerConnectEvent.Request(
+                        serverUrl = merged.serverUrl,
+                        repoId = merged.repoId,
+                        // Сервер ключ не присылает: сменился — значит, создали мы.
+                        generatedKey = merged.encryptionKey != current.encryptionKey,
+                    )
+                }.getOrElse { ServerConnectEvent.Failed(mapServerConnectFailure(it.message)) }
+            }
+        }
+
         ShardkeepApp(
             repository = taskRepository,
             quickNoteRepository = quickNoteRepository,
@@ -228,28 +271,22 @@ private fun DesktopShardkeepApp() {
                     syncConfig = config
                     syncStore.updateConfig(config.storageType, config.isComplete(), config.autoSyncEnabled)
                 },
-                onImportSyncConfig = { encoded ->
-                    runCatching { TresseConfigString.decode(encoded) }.fold(
-                        onSuccess = { decoded ->
-                            // See MainActivity: a config string is credentials only, and
-                            // the fields it omits must come from this replica, not from
-                            // TresseConfig's defaults.
-                            val current = syncConfig ?: TresseConfig()
-                            val imported = decoded.copy(
-                                languages = current.languages,
-                                ignorePatterns = current.ignorePatterns,
-                                autoSyncEnabled = current.autoSyncEnabled,
-                                autoSyncIntervalMinutes = current.autoSyncIntervalMinutes,
-                                autoSyncDebounceSeconds = current.autoSyncDebounceSeconds,
-                            )
+                onImportSyncConfig = { text ->
+                    val current = syncConfig ?: TresseConfig(autoSyncEnabled = false, ignorePatterns = DEFAULT_IGNORE_PATTERNS)
+                    runCatching {
+                        importSyncConfig(text, current) { TresseSync(fileTresseVault(root)).generateEncryptionKey() }
+                    }.fold(
+                        onSuccess = { imported ->
                             syncEngine(imported).saveConfig(imported)
                             preferences.saveLocalSync(imported)
                             syncConfig = imported
-                            true
+                            syncStore.updateConfig(imported.storageType, imported.isComplete(), imported.autoSyncEnabled)
+                            null
                         },
-                        onFailure = { false },
+                        onFailure = { (it as? ConfigImportRefused)?.failure ?: ServerConnectFailure.Decode },
                     )
                 },
+                syncConfigString = syncConfig?.shareStringOrNull(),
                 // Системного календаря у десктопа мы не трогаем — там их несколько
                 // и все чужие; отдаём .ics, который импортируется куда угодно.
                 calendarAvailable = true,
@@ -263,6 +300,38 @@ private fun DesktopShardkeepApp() {
                 },
                 onSync = { perform(false) },
                 onForcePull = { perform(true) },
+                serverConnectUrl = TRESSE_SERVER_URL,
+                onServerConnectBegin = { server ->
+                    // Адрес не https — begin бросает; это тот же отказ, что и занятый порт.
+                    val attempt = runCatching {
+                        TresseServerLink.begin(server, "http://localhost:${DesktopConnectCallbackServer.PORT}")
+                    }.getOrNull()
+                    if (attempt != null && DesktopConnectCallbackServer.start { returned -> returnedConnect = returned }) {
+                        val pending = PendingConnect(attempt, System.currentTimeMillis() + SERVER_CONNECT_TTL_MS)
+                        saveConnectAttempt(preferences, pending)
+                        connectPending = pending
+                        runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(attempt.url)) }.isSuccess
+                    } else {
+                        false
+                    }
+                },
+                serverConnectEvent = serverConnectEvent,
+                onServerConnectResolve = { accept ->
+                    val event = serverConnectEvent
+                    val merged = connectMerged
+                    serverConnectEvent = null
+                    connectMerged = null
+                    if (accept && event is ServerConnectEvent.Request && merged != null) {
+                        scope.launch {
+                            syncEngine(merged).saveConfig(merged)
+                            preferences.saveLocalSync(merged)
+                            syncConfig = merged
+                            syncStore.updateConfig(merged.storageType, merged.isComplete(), merged.autoSyncEnabled)
+                            clearConnectAttempt(preferences)
+                            connectPending = null
+                        }
+                    }
+                },
                 onWipeChunks = {
                     syncMutex.withLock {
                         val vault = fileTresseVault(root)
@@ -300,6 +369,32 @@ private fun wipeChunkStore(vault: TresseVault) {
 
 /** Forgets which repository this replica belonged to, keeping the storage coordinates. */
 private fun TresseConfig.withoutRepository() = copy(repoId = "", encryptionKey = "")
+
+/** Начатое подключение к серверу с собственным сроком жизни (библиотека TTL не хранит). */
+private data class PendingConnect(val attempt: TresseServerLink.Attempt, val expiresAtMs: Long)
+
+private fun loadConnectAttempt(prefs: Preferences): PendingConnect? {
+    val server = prefs.get("tresseConnectServer", null) ?: return null
+    val state = prefs.get("tresseConnectState", null) ?: return null
+    val url = prefs.get("tresseConnectUrl", null) ?: return null
+    val expires = prefs.getLong("tresseConnectExpires", 0L)
+    if (expires <= System.currentTimeMillis()) return null
+    return PendingConnect(TresseServerLink.Attempt(server, state, url), expires)
+}
+
+private fun saveConnectAttempt(prefs: Preferences, connect: PendingConnect) {
+    prefs.put("tresseConnectServer", connect.attempt.serverUrl)
+    prefs.put("tresseConnectState", connect.attempt.state)
+    prefs.put("tresseConnectUrl", connect.attempt.url)
+    prefs.putLong("tresseConnectExpires", connect.expiresAtMs)
+}
+
+private fun clearConnectAttempt(prefs: Preferences) {
+    prefs.remove("tresseConnectServer")
+    prefs.remove("tresseConnectState")
+    prefs.remove("tresseConnectUrl")
+    prefs.remove("tresseConnectExpires")
+}
 
 private fun SyncStatusStore.progress() = object : TresseSyncProgress {
     override fun reportCommitRead() = this@progress.reportCommitRead()

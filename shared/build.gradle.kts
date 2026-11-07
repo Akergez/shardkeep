@@ -6,6 +6,31 @@ plugins {
     alias(libs.plugins.sqldelight)
 }
 
+// Значение подставляется на CI из переменной окружения TRESSE_SERVER_URL: им заполнено
+// поле сервера на экране синхронизации (пользователь может заменить); пустое — поле пустое.
+val generateTresseServerUrl = tasks.register("generateTresseServerUrl") {
+    val url = providers.environmentVariable("TRESSE_SERVER_URL")
+        .map { it.trim().removeSuffix("/") }
+        .orElse("")
+    inputs.property("tresseServerUrl", url)
+    val outputDir = layout.buildDirectory.dir("generated/tresseServerUrl")
+    outputs.dir(outputDir)
+    doLast {
+        val dir = outputDir.get().asFile
+        dir.mkdirs()
+        val escaped = url.get().replace("\\", "\\\\").replace("\"", "\\\"")
+        dir.resolve("TresseServerUrl.kt").writeText(
+            """
+            package com.akergez.shardkeep
+
+            /** Build-time value of TRESSE_SERVER_URL; empty when the build did not set one. */
+            const val TRESSE_SERVER_URL: String = "$escaped"
+
+            """.trimIndent(),
+        )
+    }
+}
+
 kotlin {
     listOf(
         iosArm64(),
@@ -66,6 +91,10 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
+
+// Сгенерированная константа подключается снаружи блока kotlin {}: внутри sourceSets {}
+// у commonMain.kotlin неоднозначный ресивер и скрипт не компилируется.
+kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(generateTresseServerUrl)
 
 compose.resources {
     publicResClass = true

@@ -18,6 +18,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.Lifecycle
@@ -55,7 +56,16 @@ import com.akergez.shardkeep.widget.WidgetNavigation
 import com.akergez.shardkeep.widget.WidgetUpdatingQuickNoteRepository
 import com.akergez.shardkeep.widget.WidgetUpdatingTaskRepository
 import com.akergez.shardkeep.sync.TresseConfig
-import com.akergez.tresse.kmp.TresseConfigString
+import com.akergez.shardkeep.sync.ConfigImportRefused
+import com.akergez.shardkeep.sync.PendingConnect
+import com.akergez.shardkeep.sync.importSyncConfig
+import com.akergez.shardkeep.sync.shareStringOrNull
+import com.akergez.shardkeep.sync.SERVER_CONNECT_TTL_MS
+import com.akergez.shardkeep.sync.ServerConnectEvent
+import com.akergez.shardkeep.sync.ServerConnectFailure
+import com.akergez.shardkeep.sync.ServerConnectStore
+import com.akergez.shardkeep.sync.mapServerConnectFailure
+import com.akergez.tresse.kmp.TresseServerLink
 import com.akergez.tresse.kmp.TresseSync
 import com.akergez.tresse.kmp.safTresseVault
 import com.akergez.shardkeep.sync.TresseSyncScheduler
@@ -69,6 +79,8 @@ import com.akergez.shardkeep.sync.withoutRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
@@ -110,6 +122,12 @@ class MainActivity : ComponentActivity() {
 
     private fun parseDeepLink(intent: Intent?): AppDeepLink? {
         intent ?: return null
+        // Возврат с серверной страницы подключения синхронизации.
+        intent.data?.let { uri ->
+            if (uri.scheme == SERVER_CONNECT_SCHEME && uri.host == SERVER_CONNECT_HOST) {
+                return AppDeepLink.ServerConnect(uri.toString())
+            }
+        }
         return when (intent.getStringExtra(WidgetNavigation.EXTRA_NAV)) {
             WidgetNavigation.NAV_TASKS -> AppDeepLink.Tasks
             WidgetNavigation.NAV_NOTES -> AppDeepLink.Notes
@@ -119,10 +137,16 @@ class MainActivity : ComponentActivity() {
             else -> null
         }
     }
+
+    private companion object {
+        const val SERVER_CONNECT_SCHEME = "shardkeep"
+        const val SERVER_CONNECT_HOST = "tresse-connect"
+    }
 }
 
 @Composable
 private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDeepLink?>) {
+    val scope = rememberCoroutineScope()
     val workspaceRegistry = remember { WorkspaceRegistry(applicationContext) }
     var workspaceRecords by remember { mutableStateOf(workspaceRegistry.list()) }
     var activeWorkspaceId by remember { mutableStateOf(workspaceRegistry.active()?.id) }
@@ -209,6 +233,11 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
     val storage = remember(uri) { AndroidSafNotesDirectoryStorage(applicationContext, uri) }
     val configSync = remember(uri) { TresseSync(safTresseVault(applicationContext, uri)) }
     var syncConfig by remember(storage) { mutableStateOf<TresseConfig?>(null) }
+    // Подключение через сервер: попытка переживает выгрузку процесса (хранилище),
+    // слитый конфиг ожидает решения пользователя в диалоге.
+    var connectPending by remember(activeWorkspace.id) { mutableStateOf(ServerConnectStore.load(preferences)) }
+    var serverConnectEvent by remember(activeWorkspace.id) { mutableStateOf<ServerConnectEvent?>(null) }
+    var connectMerged by remember(activeWorkspace.id) { mutableStateOf<TresseConfig?>(null) }
     val taskSource = remember(storage, format) { NotesDirectoryTaskRepository(storage, format, database = database) }
     val repository = remember(taskSource) { WidgetUpdatingTaskRepository(taskSource, applicationContext) }
     val quickNoteSource = remember(storage, quickNotesFolder) { NotesDirectoryQuickNoteRepository(storage, quickNotesFolder) }
@@ -258,6 +287,33 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
         }.onFailure { e ->
             if (e is kotlinx.coroutines.CancellationException) throw e
             loadError = true
+        }
+    }
+
+    // Возврат с серверной страницы: отдаём диалогу подтверждения, а не навигации.
+    val deepLinkForApp = pendingDeepLink.value
+    LaunchedEffect(deepLinkForApp) {
+        val returned = (deepLinkForApp as? AppDeepLink.ServerConnect)?.returned ?: return@LaunchedEffect
+        pendingDeepLink.value = null
+        val pending = connectPending
+        serverConnectEvent = if (pending == null || System.currentTimeMillis() > pending.expiresAtMs) {
+            ServerConnectEvent.Failed(ServerConnectFailure.LinkMismatch)
+        } else {
+            runCatching {
+                val current = syncConfig ?: TresseConfig(ignorePatterns = DEFAULT_IGNORE_PATTERNS)
+                val merged = TresseServerLink.accept(returned, current, pending.attempt) {
+                    // newKey вызывается только для нового репозитория; генерация
+                    // ключа — короткий FFI-вызов без IO.
+                    runBlocking { configSync.generateEncryptionKey() }
+                }
+                connectMerged = merged
+                ServerConnectEvent.Request(
+                    serverUrl = merged.serverUrl,
+                    repoId = merged.repoId,
+                    // Сервер ключ не присылает: сменился — значит, создали мы.
+                    generatedKey = merged.encryptionKey != current.encryptionKey,
+                )
+            }.getOrElse { ServerConnectEvent.Failed(mapServerConnectFailure(it.message)) }
         }
     }
 
@@ -367,31 +423,23 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     pushSyncStatus(syncStatus, updated)
                     TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, updated)
                 },
-                onImportSyncConfig = { configString ->
-                    runCatching { TresseConfigString.decode(configString) }.fold(
-                        onSuccess = { decoded ->
-                            // A config string carries credentials only, so every field it
-                            // omits arrives as a default. Taking those would blank the
-                            // notes directory's ignore rules and reset this device's
-                            // schedule, neither of which the sender was sharing.
-                            val current = syncConfig ?: TresseConfig()
-                            val imported = decoded.copy(
-                                languages = current.languages,
-                                ignorePatterns = current.ignorePatterns,
-                                autoSyncEnabled = current.autoSyncEnabled,
-                                autoSyncIntervalMinutes = current.autoSyncIntervalMinutes,
-                                autoSyncDebounceSeconds = current.autoSyncDebounceSeconds,
-                            )
+                onImportSyncConfig = { text ->
+                    val current = syncConfig ?: TresseConfig(ignorePatterns = DEFAULT_IGNORE_PATTERNS)
+                    runCatching {
+                        importSyncConfig(text, current) { configSync.generateEncryptionKey() }
+                    }.fold(
+                        onSuccess = { imported ->
                             preferences.saveLocalSync(imported)
                             configSync.saveConfig(imported)
                             syncConfig = imported
                             pushSyncStatus(syncStatus, imported)
                             TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, imported)
-                            true
+                            null
                         },
-                        onFailure = { false },
+                        onFailure = { (it as? ConfigImportRefused)?.failure ?: ServerConnectFailure.Decode },
                     )
                 },
+                syncConfigString = syncConfig?.shareStringOrNull(),
                 onSync = {
                     syncStatus.begin(getString(R.string.sync_trigger_manual))
                     try {
@@ -450,6 +498,38 @@ private fun MainActivity.AndroidShardkeepApp(pendingDeepLink: MutableState<AppDe
                     TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, cleared)
                 },
                 syncState = syncStatus.state,
+                serverConnectUrl = TRESSE_SERVER_URL,
+                onServerConnectBegin = { server ->
+                    // Адрес не https — begin бросает: для экрана это просто неудачный старт.
+                    runCatching { TresseServerLink.begin(server, "shardkeep://tresse-connect") }
+                        .getOrNull()
+                        ?.let { attempt ->
+                            val pending = PendingConnect(attempt, System.currentTimeMillis() + SERVER_CONNECT_TTL_MS)
+                            ServerConnectStore.save(preferences, pending)
+                            connectPending = pending
+                            runCatching {
+                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(attempt.url)))
+                            }.isSuccess
+                        } ?: false
+                },
+                serverConnectEvent = serverConnectEvent,
+                onServerConnectResolve = { accept ->
+                    val event = serverConnectEvent
+                    val merged = connectMerged
+                    serverConnectEvent = null
+                    connectMerged = null
+                    if (accept && event is ServerConnectEvent.Request && merged != null) {
+                        scope.launch {
+                            preferences.saveLocalSync(merged)
+                            configSync.saveConfig(merged)
+                            syncConfig = merged
+                            pushSyncStatus(syncStatus, merged)
+                            TresseSyncScheduler.schedule(applicationContext, activeWorkspace.id, merged)
+                            ServerConnectStore.clear(preferences)
+                            connectPending = null
+                        }
+                    }
+                },
             ),
         )
     }

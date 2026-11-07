@@ -93,7 +93,6 @@
     <string name="sync_interval_minutes">Interval (minutes)</string>
     <string name="sync_debounce_seconds">Debounce (seconds)</string>
     <string name="ignore_patterns">Ignore patterns (one per line)</string>
-    <string name="import_config">Import tresse.toml or config string</string>
     <string name="config_import_error">Invalid or unsupported Tresse config</string>
     <string name="action_import">Import</string>
     <string name="sync_phase_idle">Ready to sync</string>
@@ -116,11 +115,10 @@
     <string name="wipe_chunks_confirm">Every locally cached chunk will be deleted and the repository ID and encryption key cleared. Without a backup of the key, versions already stored on the remote cannot be decrypted again.</string>
     <string name="wipe_chunks_action">Wipe</string>
     <string name="add_workspace">+ Add workspace</string>
-    <string name="storage_http">HTTP</string>
-    <string name="storage_s3">S3</string>
+    <string name="storage_http">Tresse server</string>
+    <string name="storage_s3">Own S3</string>
     <string name="s3_endpoint_hint">https://storage.yandexcloud.net</string>
     <string name="s3_region_hint">ru-central1</string>
-    <string name="import_config_hint">[remote]\nurl = \"https://…\"</string>
     <string name="select_notes_directory">Select notes directory</string>
     <string name="sync_not_configured_error">Sync is not configured</string>
     <string name="sync_trigger_desktop">Desktop</string>
@@ -145,4 +143,26 @@
     <string name="calendar_exported">Exported %1$d events to %2$s</string>
     <string name="search_tasks">Search files and tasks</string>
     <string name="search_nothing_found">Nothing found</string>
+    <string name="sync_server_offer_button">Sign in on the server</string>
+    <string name="sync_server_offer_description">Opens the server in the browser: sign in, create a repository or pick an existing one, and the server brings you back here with the connection.</string>
+    <string name="sync_connect_begin_failed">Could not start the connection</string>
+    <string name="sync_connect_confirm_title">Set up sync?</string>
+    <string name="sync_connect_confirm_body">Server: %1$s\nRepository: %2$s</string>
+    <string name="sync_connect_key_generated">A new encryption key will be created on this device.</string>
+    <string name="sync_connect_action">Connect</string>
+    <string name="sync_connect_error_link">This link does not belong to a connection started here. Start again from the Sync screen.</string>
+    <string name="sync_connect_error_no_config">The server link carried no configuration.</string>
+    <string name="sync_connect_error_other_server">The link points at another server than the one opened.</string>
+    <string name="sync_connect_error_no_key">This device has no encryption key for that repository. Import the full config string from a device that already syncs it.</string>
+    <string name="sync_tab_main">Main</string>
+    <string name="sync_tab_details">Details</string>
+    <string name="sync_server_field">Sync server</string>
+    <string name="sync_string_field">Connection string</string>
+    <string name="sync_string_description">From the server page or another device — if the browser did not bring you back, or you have a string of your own.</string>
+    <string name="sync_import_done">Connection saved.</string>
+    <string name="sync_export_string">Export connection string</string>
+    <string name="sync_export_description">Sets up the next device. It holds the encryption key: keep it like a password.</string>
+    <string name="sync_export_copy">Copy</string>
+    <string name="sync_export_copied">Copied to the clipboard.</string>
+    <string name="close">Close</string>
 </resources>

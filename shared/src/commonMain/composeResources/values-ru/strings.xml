@@ -93,7 +93,6 @@
     <string name="sync_interval_minutes">Интервал (минуты)</string>
     <string name="sync_debounce_seconds">Задержка (секунды)</string>
     <string name="ignore_patterns">Паттерны игнорирования (по одному на строку)</string>
-    <string name="import_config">Импорт tresse.toml или строки конфига</string>
     <string name="config_import_error">Недопустимая или неподдерживаемая конфигурация Tresse</string>
     <string name="action_import">Импортировать</string>
     <string name="sync_phase_idle">Готово к синхронизации</string>
@@ -116,11 +115,10 @@
     <string name="wipe_chunks_confirm">Все локально сохранённые чанки будут удалены, а ID репозитория и ключ шифрования — очищены. Без копии ключа расшифровать уже отправленные на сервер версии не получится.</string>
     <string name="wipe_chunks_action">Очистить</string>
     <string name="add_workspace">+ Добавить воркспейс</string>
-    <string name="storage_http">HTTP</string>
-    <string name="storage_s3">S3</string>
+    <string name="storage_http">Сервер Tresse</string>
+    <string name="storage_s3">Свой S3</string>
     <string name="s3_endpoint_hint">https://storage.yandexcloud.net</string>
     <string name="s3_region_hint">ru-central1</string>
-    <string name="import_config_hint">[remote]\nurl = \"https://…\"</string>
     <string name="select_notes_directory">Выберите каталог заметок</string>
     <string name="sync_not_configured_error">Синхронизация не настроена</string>
     <string name="sync_trigger_desktop">Компьютер</string>
@@ -145,4 +143,26 @@
     <string name="calendar_exported">Выгружено событий: %1$d → %2$s</string>
     <string name="search_tasks">Поиск по файлам и задачам</string>
     <string name="search_nothing_found">Ничего не найдено</string>
+    <string name="sync_server_offer_button">Войти на сервере</string>
+    <string name="sync_server_offer_description">Откроет сервер в браузере: войдите, создайте репозиторий или выберите существующий — сервер вернёт вас сюда с готовым подключением.</string>
+    <string name="sync_connect_begin_failed">Не удалось начать подключение</string>
+    <string name="sync_connect_confirm_title">Настроить синхронизацию?</string>
+    <string name="sync_connect_confirm_body">Сервер: %1$s\nРепозиторий: %2$s</string>
+    <string name="sync_connect_key_generated">На этом устройстве будет создан новый ключ шифрования.</string>
+    <string name="sync_connect_action">Подключить</string>
+    <string name="sync_connect_error_link">Эта ссылка не относится к подключению, начатому здесь. Начните заново с экрана синхронизации.</string>
+    <string name="sync_connect_error_no_config">Ссылка с сервера не содержит конфигурации.</string>
+    <string name="sync_connect_error_other_server">Ссылка ведёт на другой сервер, не тот, что был открыт.</string>
+    <string name="sync_connect_error_no_key">На этом устройстве нет ключа шифрования для этого репозитория. Импортируйте полную строку конфигурации с устройства, которое уже его синхронизирует.</string>
+    <string name="sync_tab_main">Основное</string>
+    <string name="sync_tab_details">Подробно</string>
+    <string name="sync_server_field">Сервер синхронизации</string>
+    <string name="sync_string_field">Строка подключения</string>
+    <string name="sync_string_description">Со страницы сервера или с другого устройства — если браузер не вернул вас в приложение или у вас своя строка.</string>
+    <string name="sync_import_done">Подключение сохранено.</string>
+    <string name="sync_export_string">Экспортировать строку подключения</string>
+    <string name="sync_export_description">Для настройки следующего устройства. В строке ключ шифрования — храните её как пароль.</string>
+    <string name="sync_export_copy">Копировать</string>
+    <string name="sync_export_copied">Скопировано в буфер обмена.</string>
+    <string name="close">Закрыть</string>
 </resources>
