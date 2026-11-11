@@ -3,7 +3,6 @@ package com.akergez.shardkeep.ui.navigation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import com.akergez.shardkeep.ui.AppSection
 import org.jetbrains.compose.resources.painterResource
@@ -19,12 +18,13 @@ fun AppNavigationBar(
     NavigationBar {
         AppNavigationDestinations(
             showNotes = showNotes,
+            compact = true,
             item = { destination, icon, label ->
                 NavigationBarItem(
                     selected = section == destination,
                     onClick = { onSectionChange(destination) },
                     icon = { Icon(painterResource(icon), contentDescription = null) },
-                    label = { Text(stringResource(label)) },
+                    label = { NavigationLabel(stringResource(label)) },
                 )
             },
         )

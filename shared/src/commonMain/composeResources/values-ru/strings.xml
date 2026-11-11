@@ -40,6 +40,7 @@
     <string name="file_filter">Файл: %1$s</string>
     <string name="tasks">Задачи</string>
     <string name="quick_notes">Быстрые заметки</string>
+    <string name="quick_notes_short">Заметки</string>
     <string name="new_note">Новая заметка</string>
     <string name="text_note">Текст</string>
     <string name="checklist">Чек-лист</string>
@@ -79,6 +80,7 @@
     <string name="settings_saved">Настройки сохранены</string>
     <string name="no_settings_available">Настройки недоступны.</string>
     <string name="sync_title">Синхронизация</string>
+    <string name="sync_title_short">Синхр.</string>
     <string name="sync_config_hint">Параметры подключения хранятся в tresse.toml в корне каталога заметок.</string>
     <string name="repo_id">ID репозитория</string>
     <string name="encryption_key">Ключ шифрования</string>

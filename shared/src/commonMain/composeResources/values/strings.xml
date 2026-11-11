@@ -40,6 +40,7 @@
     <string name="file_filter">File: %1$s</string>
     <string name="tasks">Tasks</string>
     <string name="quick_notes">Quick notes</string>
+    <string name="quick_notes_short">Notes</string>
     <string name="new_note">New note</string>
     <string name="text_note">Text</string>
     <string name="checklist">Checklist</string>
@@ -79,6 +80,7 @@
     <string name="settings_saved">Settings saved</string>
     <string name="no_settings_available">No settings available.</string>
     <string name="sync_title">Sync</string>
+    <string name="sync_title_short">Sync</string>
     <string name="sync_config_hint">Connection parameters are stored in tresse.toml at the notes directory root.</string>
     <string name="repo_id">Repository ID</string>
     <string name="encryption_key">Encryption key</string>

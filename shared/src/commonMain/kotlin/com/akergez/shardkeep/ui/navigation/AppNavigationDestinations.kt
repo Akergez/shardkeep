@@ -12,22 +12,32 @@ import shardkeep.shared.generated.resources.ic_format_list
 import shardkeep.shared.generated.resources.ic_settings
 import shardkeep.shared.generated.resources.ic_sync
 import shardkeep.shared.generated.resources.quick_notes
+import shardkeep.shared.generated.resources.quick_notes_short
 import shardkeep.shared.generated.resources.settings
 import shardkeep.shared.generated.resources.sync_title
+import shardkeep.shared.generated.resources.sync_title_short
 import shardkeep.shared.generated.resources.tasks
 
 /**
  * Единственный список пунктов навигации: три контейнера рисуют его каждый по-своему,
  * но состав и порядок задаются здесь, чтобы они не разъехались.
+ *
+ * [compact] — для нижней панели и рельса, где на подпись приходится узкая колонка:
+ * там длинные названия заменены короткими.
  */
 @Composable
 fun AppNavigationDestinations(
     showNotes: Boolean,
+    compact: Boolean = false,
     item: @Composable (AppSection, DrawableResource, StringResource) -> Unit,
 ) {
     item(AppSection.Tasks, Res.drawable.ic_calendar_today, Res.string.tasks)
     item(AppSection.AllTasks, Res.drawable.ic_format_list, Res.string.all_tasks)
-    if (showNotes) item(AppSection.Notes, Res.drawable.ic_article, Res.string.quick_notes)
-    item(AppSection.Sync, Res.drawable.ic_sync, Res.string.sync_title)
+    if (showNotes) {
+        val notes = if (compact) Res.string.quick_notes_short else Res.string.quick_notes
+        item(AppSection.Notes, Res.drawable.ic_article, notes)
+    }
+    val sync = if (compact) Res.string.sync_title_short else Res.string.sync_title
+    item(AppSection.Sync, Res.drawable.ic_sync, sync)
     item(AppSection.Settings, Res.drawable.ic_settings, Res.string.settings)
 }
